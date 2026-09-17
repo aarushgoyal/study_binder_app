@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Study Binder</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B2430">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Study Binder">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+<style>
+  :root {
+    --ink: #1B2430; --paper: #F5F6F1; --card: #FFFFFF; --border: #DDE0D6;
+    --accent: #2F6F4F; --accent-soft: #E4EFE7; --gold: #C08A2E;
+    --text: #23282F; --text-dim: #6B7280; --danger: #B5453A;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; max-width: 100%;
+    font-family: 'Public Sans', -apple-system, sans-serif; color: var(--text); background: var(--paper); }
+  .serif { font-family: 'Fraunces', Georgia, serif; }
+  #app { display: flex; min-height: 100vh; width: 100%; max-width: 100%; }
+
+  .setup-wrap { max-width: 680px; margin: 0 auto; padding: 56px 24px; }
+  .setup-wrap h1 { font-size: 28px; margin: 0 0 6px 0; }
+  .setup-wrap p.lead { color: var(--text-dim); font-size: 15px; line-height: 1.55; }
+  .setup-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
+  .setup-card h2 { font-size: 16px; margin: 0 0 10px 0; }
+  .setup-error { background: #FBEAE8; border: 1px solid #E9BAB3; color: var(--danger); padding: 10px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 14px; }
+  .setup-wrap input[type=text], .setup-wrap input[type=email], .setup-wrap input[type=password] {
+    width: 100%; font-size: 14px; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; background: #FCFCFA; margin-bottom: 0;
+  }
+  .setup-wrap input[type=text]:focus, .setup-wrap input[type=email]:focus, .setup-wrap input[type=password]:focus { outline: none; border-color: var(--accent); }
+  .setup-card input + input { margin-top: 10px; }
+
+  .btn { padding: 10px 18px; border-radius: 8px; font-size: 14.5px; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 8px; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #275C41; }
+  .btn.text { background: none; color: var(--text-dim); }
+  .btn.text:hover { color: var(--text); }
+  .btn:disabled { opacity: 0.6; cursor: default; }
+
+  .sidebar { width: 272px; flex-shrink: 0; background: var(--ink); color: #E8EAE3; display: flex; flex-direction: column; padding: 24px 18px; min-height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .brand-title { font-size: 20px; font-weight: 600; }
+  .brand-sub { font-size: 12.5px; color: #9AA3AE; margin-bottom: 18px; }
+  .close-btn { display: none; margin-left: auto; color: #B7C0C9; background: none; border: none; cursor: pointer; }
+
+  .role-badge { font-size: 11px; padding: 4px 9px; border-radius: 20px; display: inline-block; margin-bottom: 14px; }
+  .role-badge.admin { background: rgba(192,138,46,0.2); color: #F0D9A8; }
+  .role-badge.viewer { background: rgba(255,255,255,0.08); color: #9AA3AE; }
+
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  #searchInput { width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; color: #fff; padding: 9px 11px; font-size: 13.5px; font-family: inherit; }
+  #searchInput::placeholder { color: #8B94A0; }
+  #searchInput:focus { outline: none; border-color: var(--gold); }
+  #searchDropdown { display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: #fff; color: var(--text); border-radius: 10px; box-shadow: 0 14px 30px rgba(0,0,0,0.28);
+    max-height: 320px; overflow-y: auto; z-index: 30; padding: 6px 0; }
+  #searchDropdown.open { display: block; }
+  .search-group-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); padding: 8px 12px 4px; }
+  .search-result-item { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; }
+  .search-result-item:hover { background: var(--accent-soft); }
+  .search-result-item span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .search-result-chapter { color: var(--text-dim); font-size: 12px; flex-shrink: 0; }
+  .search-empty { padding: 10px 12px; font-size: 13px; color: var(--text-dim); }
+
+  .nav-btn { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+    color: #E8EAE3; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; cursor: pointer;
+    margin-bottom: 10px; text-align: left; font-family: inherit; }
+  .nav-btn:hover { background: rgba(255,255,255,0.12); }
+
+  .chapter-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .chapter-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; border-left: 3px solid transparent; cursor: pointer; }
+  .chapter-item[draggable="true"] { cursor: grab; }
+  .chapter-item.drag-over { box-shadow: inset 0 2px 0 var(--gold); }
+  .chapter-item:hover { background: rgba(255,255,255,0.05); }
+  .chapter-item.active { background: rgba(255,255,255,0.08); border-left: 3px solid var(--gold); }
+  .chapter-num { font-family: 'Fraunces', serif; font-size: 13px; color: #7C8794; width: 20px; flex-shrink: 0; }
+  .chapter-title { font-size: 14.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chapter-actions { display: none; gap: 4px; }
+  .chapter-item:hover .chapter-actions { display: flex; }
+  .icon-btn { background: transparent; border: none; color: #B7C0C9; cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+  .icon-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+  .icon-btn.dim { color: #6B7280; }
+
+  .rename-row { display: flex; gap: 6px; padding: 6px 4px; align-items: center; }
+  .rename-row input { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 6px 8px; font-size: 13.5px; }
+  .inline-confirm { margin: 4px 0 8px 0; background: rgba(181,69,58,0.15); border: 1px solid rgba(181,69,58,0.4); padding: 10px; border-radius: 8px; font-size: 12.5px; }
+  .inline-confirm p { margin: 0 0 8px 0; color: #E8AFA8; }
+  .mini-row { display: flex; gap: 8px; }
+  .mini-btn { flex: 1; padding: 7px 0; border-radius: 6px; font-size: 13px; border: none; cursor: pointer; font-weight: 600; }
+  .mini-btn.primary { background: var(--gold); color: #1B2430; }
+  .mini-btn.ghost { background: rgba(255,255,255,0.08); color: #E8EAE3; }
+  .mini-btn.danger { background: #B5453A; color: #fff; }
+
+  .add-chapter { margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px; }
+  .add-btn { display: flex; align-items: center; gap: 8px; width: 100%; background: rgba(255,255,255,0.06); border: 1px dashed rgba(255,255,255,0.25); color: #E8EAE3; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; }
+  .add-btn:hover { background: rgba(255,255,255,0.1); }
+  .add-form { display: flex; flex-direction: column; gap: 8px; }
+  .add-form input { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 8px 10px; font-size: 13.5px; }
+
+  .conn-status { font-size: 11.5px; color: #6D7684; margin-top: 12px; display: flex; align-items: center; gap: 6px; }
+  .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: #3E9C6E; flex-shrink: 0; }
+  .sidebar-footer-link { font-size: 12px; color: #7C8794; background: none; border: none; cursor: pointer; text-align: left; padding: 4px 0; display: block; font-family: inherit; }
+  .sidebar-footer-link:hover { color: #E8935B; }
+
+  .main { flex: 1; min-width: 0; max-width: 100%; padding: 36px 44px; overflow-y: auto; overflow-x: hidden; }
+  .mobile-bar { display: none; }
+  .empty-state { min-height: 70vh; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; max-width: 620px; }
+  .empty-state h2 { font-size: 26px; margin: 14px 0 8px 0; }
+  .empty-state p { color: var(--text-dim); font-size: 15px; line-height: 1.55; margin: 0 0 18px 0; }
+
+  .dashboard-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 22px 0; }
+  .stat-tile { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; min-width: 92px; }
+  .stat-tile strong { display: block; font-size: 21px; font-family: 'Fraunces', serif; }
+  .stat-tile span { font-size: 12px; color: var(--text-dim); }
+  .stat-tile.accent { border-color: var(--accent); background: var(--accent-soft); }
+
+  .chapter-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+  .chapter-header h1 { font-size: 30px; font-weight: 600; margin: 0; line-height: 1.2; overflow-wrap: anywhere; }
+  .chapter-eyebrow { font-size: 13px; color: var(--text-dim); margin: 0 0 4px 0; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 26px; flex-wrap: wrap; }
+  .tab { display: flex; align-items: center; gap: 7px; padding: 10px 4px; margin-right: 26px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 14.5px; color: var(--text-dim); font-weight: 500; }
+  .tab.active { color: var(--ink); border-bottom: 2px solid var(--accent); }
+
+  .panel { display: none; max-width: 100%; }
+  .panel.active { display: block; }
+  .panel-empty { border: 1px dashed var(--border); border-radius: 12px; padding: 30px 26px; color: var(--text-dim); font-size: 14.5px; background: rgba(255,255,255,0.5); }
+  .panel-empty strong { color: var(--text); display: block; margin-bottom: 4px; font-size: 15px; }
+
+  .form-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 22px; max-width: 100%; }
+  .form-grid { display: flex; flex-direction: column; gap: 10px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 5px; }
+  .field input[type=text], .field input[type=email], .field input[type=password], .field textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font-size: 14px; font-family: inherit; background: #FCFCFA; }
+  .field textarea { resize: vertical; min-height: 64px; }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .form-actions { display: flex; gap: 10px; margin-top: 4px; align-items: center; flex-wrap: wrap; }
+
+  .file-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .file-choose-btn { border: 1px solid var(--border); background: #FCFCFA; padding: 8px 12px; border-radius: 8px; font-size: 13.5px; cursor: pointer; color: var(--text); }
+  .file-chosen { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+  .file-chosen button { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; }
+  .uploading-note { font-size: 13px; color: var(--accent); margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .list { display: flex; flex-direction: column; gap: 12px; max-width: 100%; }
+  .item-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 15px 17px; max-width: 100%; overflow: hidden; }
+  .item-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .item-title { font-size: 15.5px; font-weight: 600; margin: 0 0 4px 0; overflow-wrap: anywhere; }
+  .item-link { font-size: 13px; color: var(--accent); word-break: break-all; overflow-wrap: anywhere; text-decoration: none; }
+  .item-link:hover { text-decoration: underline; }
+  .item-desc { font-size: 14px; color: var(--text); margin: 6px 0 0 0; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  .file-row-view { margin-top: 10px; max-width: 100%; }
+  .file-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--accent-soft); padding: 7px 12px; border-radius: 8px; font-size: 13px; color: var(--accent); text-decoration: none; max-width: 100%; word-break: break-all; overflow-wrap: anywhere; }
+  .file-chip:hover { text-decoration: underline; }
+  .file-chip .fsize { color: #5C8E76; font-size: 12px; white-space: nowrap; }
+  .preview-toggle { background: none; border: none; color: var(--accent); font-size: 12.5px; cursor: pointer; margin-left: 8px; text-decoration: underline; }
+  .preview-box { margin-top: 10px; max-width: 100%; }
+  .preview-box img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; user-select: none; }
+  .preview-box iframe { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 8px; }
+  .preview-box:fullscreen, .preview-box:-webkit-full-screen { background: #000; display: flex !important; align-items: center; justify-content: center; }
+  .preview-box:fullscreen img, .preview-box:-webkit-full-screen img { max-width: 100vw; max-height: 100vh; border: none; border-radius: 0; object-fit: contain; }
+  .preview-box:fullscreen iframe, .preview-box:-webkit-full-screen iframe { width: 100vw; height: 100vh; border: none; border-radius: 0; }
+  .file-note { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; }
+
+  .answer-toggle { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--accent); background: var(--accent-soft); border: none; padding: 6px 10px; border-radius: 7px; cursor: pointer; font-weight: 600; }
+  .answer-box { margin-top: 10px; background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+  .mastered-row { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12.5px; color: var(--text-dim); }
+  .mastered-row input { accent-color: var(--accent); }
+
+  .loading { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 14px; padding: 30px 0; }
+
+  .device-table { display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
+  .device-row { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .device-row.revoked { opacity: 0.6; border-color: var(--danger); }
+  .device-name { font-weight: 600; font-size: 14.5px; }
+  .device-meta { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+  .device-tag { font-size: 11px; padding: 3px 8px; border-radius: 20px; background: var(--accent-soft); color: var(--accent); margin-left: 8px; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  .modal-card { background: var(--card); border-radius: 14px; padding: 26px; max-width: 380px; width: 100%; }
+  .modal-card h2 { margin: 0 0 4px 0; font-size: 20px; }
+  .modal-card p.hint { font-size: 13px; color: var(--text-dim); margin: 0 0 16px 0; }
+  .modal-error { background: #FBEAE8; border: 1px solid #E9BAB3; color: var(--danger); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+
+  @media (max-width: 780px) {
+    .sidebar { position: fixed; z-index: 20; left: 0; top: 0; bottom: 0; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.25); }
+    .sidebar.open { transform: translateX(0); }
+    .close-btn { display: flex; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 15; }
+    .mobile-bar { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--paper); position: sticky; top: 0; z-index: 5; }
+    .mobile-bar button { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+    .mobile-bar span { font-weight: 600; font-size: 15px; }
+    .main { padding: 20px; }
+    .chapter-header h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F6F1;font-family:-apple-system,sans-serif;color:#6B7280;font-size:14px;">Loading Study Binder&hellip;</div></div>
+
+<!--
+  ONE-TIME SETUP FOR YOU (the site owner):
+  Replace the two placeholder values below with your Supabase Project URL
+  and anon public key (Project Settings -> API in Supabase). Every visitor
+  who opens this page will then connect automatically - no setup screen.
+-->
+<script>
+  const SUPABASE_URL = 'https://euaopedkdcwzfurftqgw.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1YW9wZWRrZGN3emZ1cmZ0cWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyODY3NTYsImV4cCI6MjEwNDg2Mjc1Nn0.PmUbSXNtdYl8SSh7xl8rz0D7UMTncrDHWORVmYgnv_Y';
+</script>
+
+<script>
+/* ================= helpers ================= */
+function esc(s){ if (s===undefined||s===null) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function formatBytes(b){ if (b===undefined||b===null) return ''; if (b<1024) return b+' B'; if (b<1024*1024) return (b/1024).toFixed(1)+' KB'; return (b/(1024*1024)).toFixed(1)+' MB'; }
+function newId(){ return (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2,10))); }
+function fileExt(name){ return (name||'').split('.').pop().toLowerCase(); }
+function isImageExt(ext){ return ['png','jpg','jpeg','gif','webp','svg'].includes(ext); }
+function isPdfExt(ext){ return ext === 'pdf'; }
+function timeAgo(iso){
+  if (!iso) return '';
+  const d = new Date(iso), diff = (Date.now()-d.getTime())/1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60)+'m ago';
+  if (diff < 86400) return Math.floor(diff/3600)+'h ago';
+  return Math.floor(diff/86400)+'d ago';
+}
+function guessDeviceLabel(){
+  const ua = navigator.userAgent;
+  let os = 'Unknown device';
+  if (/ipad/i.test(ua)) os='iPad'; else if (/iphone/i.test(ua)) os='iPhone';
+  else if (/android/i.test(ua)) os='Android'; else if (/mac os/i.test(ua)) os='Mac';
+  else if (/windows/i.test(ua)) os='Windows'; else if (/linux/i.test(ua)) os='Linux';
+  let browser='a browser';
+  if (/edg\//i.test(ua)) browser='Edge'; else if (/chrome\//i.test(ua) && !/edg/i.test(ua)) browser='Chrome';
+  else if (/firefox\//i.test(ua)) browser='Firefox'; else if (/safari\//i.test(ua) && !/chrome/i.test(ua)) browser='Safari';
+  return `${browser} on ${os}`;
+}
+const BROWSER_ID_STORAGE_KEY = 'study-binder-browser-id';
+function getBrowserId(){
+  try {
+    let id = localStorage.getItem(BROWSER_ID_STORAGE_KEY);
+    if (!id) {
+      id = newId();
+      localStorage.setItem(BROWSER_ID_STORAGE_KEY, id);
+    }
+    return id;
+  } catch (error) {
+    return newId(); // Private/restricted storage cannot retain a browser block.
+  }
+}
+const BUCKET = 'uploads';
+
+/* ================= global state ================= */
+let sbClient = null;
+let currentUser = null;
+let isAdmin = false;
+let chapters = [];
+let activeChapterId = null;
+let activeTab = 'resources';
+let currentView = 'chapter'; // 'chapter' | 'devices'
+let resourcesCache = [], questionsCache = [], notesCache = [];
+let devicesCache = [];
+let revealed = {};
+let searchTerm = '';
+let dragSourceId = null;
+let searchDebounceTimer = null;
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+let inactivityTimer = null;
+
+const ui = {
+  sidebarOpen: false,
+  addingChapter: false,
+  editingChapterId: null,
+  confirmDeleteChapterId: null,
+  confirmResetAll: false,
+  showAdminLogin: false,
+  adminLoginError: null,
+};
+
+let pendingFile = { resource: null, question: null };
+
+/* ================= boot ================= */
+window.addEventListener('DOMContentLoaded', boot);
+
+async function boot(){
+  if (!SUPABASE_URL || SUPABASE_URL.indexOf('PASTE_') === 0) {
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('app').innerHTML = `
+      <div class="setup-wrap">
+        <h1 class="serif">Almost there</h1>
+        <p class="lead">Open this HTML file, find the two lines near the top that say
+        <code>PASTE_YOUR_SUPABASE_PROJECT_URL_HERE</code> and <code>PASTE_YOUR_SUPABASE_ANON_KEY_HERE</code>,
+        and replace them with your Supabase Project URL and anon public key (from Project Settings &rarr; API
+        in your Supabase dashboard). Save the file and re-upload it. After that, this screen won't show again for anyone.</p>
+      </div>`;
+    return;
+  }
+
+  sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+
+  let recoveryMode = false;
+  sbClient.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') { recoveryMode = true; renderSetNewPasswordScreen(); }
+  });
+
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (recoveryMode) return;
+  if (session && session.user) {
+    currentUser = session.user;
+    isAdmin = !!(currentUser && currentUser.is_anonymous === false);
+    const [device] = await Promise.all([ checkInDevice(), loadChapters() ]);
+    if (!isAdmin && device && device.revoked) { renderRevokedScreen(); return; }
+    renderShell();
+  } else {
+    renderLandingGate();
+  }
+}
+
+function showFatalError(msg){
+  const app = document.getElementById('app');
+  app.style.display = 'block';
+  app.innerHTML = `<div class="setup-wrap"><h1 class="serif">Something went wrong</h1><p class="lead">${esc(msg)}</p></div>`;
+}
+
+function renderRevokedScreen(){
+  const app = document.getElementById('app');
+  app.style.display = 'block';
+  app.innerHTML = `
+    <div class="setup-wrap">
+      <h1 class="serif">This device's access was removed</h1>
+      <p class="lead">The site owner revoked access for this browser. If you think that's a mistake, contact them directly.</p>
+    </div>`;
+}
+
+function renderSetNewPasswordScreen(error){
+  const app = document.getElementById('app');
+  app.style.display = 'block';
+  app.innerHTML = `
+    <div class="setup-wrap" style="max-width:420px;">
+      <h1 class="serif">Set a new password</h1>
+      <p class="lead">Choose a new password for your admin account.</p>
+      ${error ? `<div class="setup-error">${esc(error)}</div>` : ''}
+      <div class="setup-card">
+        <input type="password" id="newPassword" placeholder="New password (min 6 characters)" />
+        <div class="form-actions"><button class="btn primary" data-action="set-new-password">Save password</button></div>
+      </div>
+    </div>`;
+  focusEl('newPassword');
+}
+async function setNewPassword(){
+  const pw = document.getElementById('newPassword').value;
+  if (!pw || pw.length < 6) { renderSetNewPasswordScreen('Password should be at least 6 characters.'); return; }
+  const { data, error } = await sbClient.auth.updateUser({ password: pw });
+  if (error) { renderSetNewPasswordScreen(error.message); return; }
+  currentUser = data.user; isAdmin = true;
+  await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+  renderShell();
+}
+
+/* landing gate: shown whenever there is no existing session on this browser */
+function renderLandingGate(error){
+  const app = document.getElementById('app');
+  app.style.display = 'block';
+  app.innerHTML = `
+    <div class="setup-wrap" style="max-width:460px;">
+      <h1 class="serif">Welcome to Study Binder</h1>
+      <p class="lead">Enter your name to browse, or sign in below if you're the admin.</p>
+      ${error ? `<div class="setup-error">${esc(error)}</div>` : ''}
+      <div class="setup-card">
+        <h2>Continue as visitor</h2>
+        <input type="text" id="visitorName" placeholder="Your name" />
+        <div class="form-actions"><button class="btn primary" data-action="visitor-continue">Continue</button></div>
+      </div>
+      <div class="setup-card">
+        <h2>Admin sign in</h2>
+        <input type="email" id="gateAdminEmail" placeholder="Email" />
+        <input type="password" id="gateAdminPassword" placeholder="Password" />
+        <div class="form-actions">
+          <button class="btn primary" data-action="gate-admin-login">Sign in</button>
+          <button class="btn text" data-action="gate-admin-forgot">Forgot password?</button>
+        </div>
+      </div>
+    </div>`;
+  focusEl('visitorName');
+}
+async function visitorContinue(){
+  const nameInput = document.getElementById('visitorName');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); return; }
+  const { data, error } = await sbClient.auth.signInAnonymously();
+  if (error) { renderLandingGate(error.message); return; }
+  currentUser = data.user; isAdmin = false;
+  let device;
+  try {
+    [device] = await Promise.all([ registerDevice(name), loadChapters() ]);
+  } catch (error) {
+    await sbClient.auth.signOut();
+    currentUser = null;
+    renderLandingGate('Could not verify this browser: ' + error.message);
+    return;
+  }
+  if (device && device.revoked) { renderRevokedScreen(); return; }
+  renderShell();
+}
+async function gateAdminLogin(){
+  const email = document.getElementById('gateAdminEmail').value.trim();
+  const password = document.getElementById('gateAdminPassword').value;
+  if (!email || !password) return;
+  const previousAnonymousUserId = currentUser && !isAdmin ? currentUser.id : null;
+  const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+  if (error) { renderLandingGate(error.message); return; }
+  currentUser = data.user; isAdmin = true;
+  if (previousAnonymousUserId) await removeDevice(previousAnonymousUserId);
+  await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+  renderShell();
+}
+async function gateAdminForgot(){
+  const email = document.getElementById('gateAdminEmail').value.trim();
+  if (!email) { renderLandingGate('Enter your email above first, then click "Forgot password?" again.'); return; }
+  const { error } = await sbClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  if (error) { renderLandingGate(error.message); return; }
+  alert('Check your email for a password reset link.');
+}
+
+/* Device entries exist only while their browser session is active. */
+async function registerDevice(name){
+  if (!isAdmin) {
+    const { data, error } = await sbClient.rpc('register_browser_device', {
+      p_browser_id: getBrowserId(), p_device_name: name
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+  const { data } = await sbClient.from('devices').upsert({
+    user_id: currentUser.id, device_name: name, is_admin: isAdmin, last_seen: new Date().toISOString(),
+  }, { onConflict: 'user_id' }).select().single();
+  return data;
+}
+async function removeDevice(userId){
+  if (!userId) return;
+  const { error } = await sbClient.from('devices').delete().eq('user_id', userId).eq('revoked', false);
+  if (error) console.warn('Could not remove the signed-out device:', error.message);
+}
+async function checkInDevice(){
+  const { data } = await sbClient.from('devices').update({ last_seen: new Date().toISOString() }).eq('user_id', currentUser.id).select().maybeSingle();
+  if (data) return data;
+  return registerDevice(guessDeviceLabel());
+}
+
+/* ================= data loading ================= */
+async function loadChapters(){
+  let { data, error } = await sbClient.from('chapters').select('*').order('position', { ascending: true, nullsFirst: false });
+  if (error) ({ data, error } = await sbClient.from('chapters').select('*').order('created_at', { ascending: true }));
+  chapters = data || [];
+}
+async function loadChapterItems(chapterId){
+  const [r, q, n] = await Promise.all([
+    sbClient.from('resources').select('*').eq('chapter_id', chapterId).order('created_at'),
+    sbClient.from('questions').select('*').eq('chapter_id', chapterId).order('created_at'),
+    sbClient.from('notes').select('*').eq('chapter_id', chapterId).order('created_at'),
+  ]);
+  resourcesCache = r.data || []; questionsCache = q.data || []; notesCache = n.data || [];
+}
+async function mountChapter(chapterId, initialTab){
+  currentView = 'chapter';
+  activeChapterId = chapterId;
+  activeTab = initialTab || 'resources';
+  revealed = {};
+  renderMainInto();
+  renderChapterList();
+  await loadChapterItems(chapterId);
+  renderList('resources'); renderList('questions'); renderList('notes');
+}
+
+/* ================= admin auth ================= */
+function openAdminLogin(){ ui.showAdminLogin = true; ui.adminLoginError = null; renderModal(); }
+function closeAdminLogin(){ ui.showAdminLogin = false; renderModal(); }
+function renderModal(){
+  let host = document.getElementById('modalHost');
+  if (!host) { host = document.createElement('div'); host.id = 'modalHost'; document.body.appendChild(host); }
+  if (!ui.showAdminLogin) { host.innerHTML = ''; return; }
+  host.innerHTML = `
+    <div class="modal-overlay" data-action="close-admin-login-bg">
+      <div class="modal-card" data-action="noop">
+        <h2 class="serif">Admin sign in</h2>
+        <p class="hint">Sign in with the email &amp; password you set up in Supabase to unlock editing on this device.</p>
+        ${ui.adminLoginError ? `<div class="modal-error">${esc(ui.adminLoginError)}</div>` : ''}
+        <div class="form-grid">
+          <div class="field"><label>Email</label><input type="email" id="adminEmail" /></div>
+          <div class="field"><label>Password</label><input type="password" id="adminPassword" /></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn primary" data-action="admin-login">Sign in</button>
+          <button class="btn text" data-action="close-admin-login">Cancel</button>
+        </div>
+        <button class="btn text" data-action="admin-forgot" style="margin-top:6px;padding-left:0;">Forgot password?</button>
+      </div>
+    </div>`;
+  focusEl('adminEmail');
+}
+async function adminLogin(){
+  const email = document.getElementById('adminEmail').value.trim();
+  const password = document.getElementById('adminPassword').value;
+  if (!email || !password) return;
+  const previousAnonymousUserId = currentUser && !isAdmin ? currentUser.id : null;
+  const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+  if (error) { ui.adminLoginError = error.message; renderModal(); return; }
+  currentUser = data.user; isAdmin = true;
+  if (previousAnonymousUserId) await removeDevice(previousAnonymousUserId);
+  ui.showAdminLogin = false;
+  renderModal();
+  await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+  renderShell();
+}
+async function adminForgotPassword(){
+  const email = document.getElementById('adminEmail').value.trim();
+  if (!email) { ui.adminLoginError = 'Enter your email above first, then click "Forgot password?" again.'; renderModal(); return; }
+  const { error } = await sbClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  if (error) { ui.adminLoginError = error.message; renderModal(); return; }
+  ui.adminLoginError = null;
+  alert('Check your email for a password reset link.');
+}
+async function adminSignOut(){
+  await signOutCurrentUser();
+}
+
+/* Sign every browser session out after ten minutes without user activity. */
+function resetInactivityTimer(){
+  if (!currentUser) return;
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(signOutForInactivity, INACTIVITY_TIMEOUT_MS);
+}
+function stopInactivityTimer(){
+  clearTimeout(inactivityTimer);
+  inactivityTimer = null;
+}
+async function signOutForInactivity(){
+  await signOutCurrentUser('You were signed out after 10 minutes of inactivity.');
+}
+async function signOutCurrentUser(message){
+  stopInactivityTimer();
+  const userId = currentUser && currentUser.id;
+  if (userId) await removeDevice(userId);
+  await sbClient.auth.signOut();
+  currentUser = null; isAdmin = false;
+  currentView = 'chapter';
+  renderLandingGate(message);
+}
+['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(eventName => {
+  document.addEventListener(eventName, resetInactivityTimer, { passive: true });
+});
+
+/* ================= devices view (admin only) ================= */
+async function openDevicesView(){
+  if (!isAdmin) return;
+  currentView = 'devices';
+  ui.sidebarOpen = false; setSidebarOpenState();
+  renderMainInto();
+  const { data, error } = await sbClient.from('devices').select('*').order('last_seen', { ascending: false });
+  devicesCache = data || [];
+  renderDevicesList();
+}
+async function toggleDeviceRevoke(userId){
+  const d = devicesCache.find(x => x.user_id === userId);
+  if (!d) return;
+  await sbClient.from('devices').update({ revoked: !d.revoked }).eq('user_id', userId);
+  await refreshDevicesList();
+}
+async function deleteDevicePermanently(userId){
+  if (!confirm('Delete this device from the list permanently? Note: if it is currently revoked, deleting also lifts that block — if it reconnects it will show up again and you would need to revoke it again. This cannot be undone.')) return;
+  await sbClient.from('devices').delete().eq('user_id', userId);
+  await refreshDevicesList();
+}
+async function refreshDevicesList(){
+  const { data } = await sbClient.from('devices').select('*').order('last_seen', { ascending: false });
+  devicesCache = data || [];
+  renderDevicesList();
+}
+function renderDevicesList(){
+  const el = document.getElementById('devicesList');
+  if (!el) return;
+  if (devicesCache.length === 0) { el.innerHTML = `<div class="panel-empty">No devices have connected yet.</div>`; return; }
+  el.innerHTML = `<div class="device-table">` + devicesCache.map(d => `
+    <div class="device-row ${d.revoked?'revoked':''}">
+      <div>
+        <span class="device-name">${esc(d.device_name || 'Unknown device')}</span>
+        ${d.user_id === currentUser.id ? '<span class="device-tag">You</span>' : ''}
+        ${d.is_admin ? '<span class="device-tag">Admin</span>' : ''}
+        ${d.revoked ? '<span class="device-tag" style="background:#FBEAE8;color:#B5453A;">Revoked</span>' : ''}
+        <div class="device-meta">Last seen ${timeAgo(d.last_seen)}</div>
+      </div>
+      ${d.user_id !== currentUser.id ? `
+        <div style="display:flex;gap:6px;">
+          <button class="btn ${d.revoked?'primary':'text'}" data-action="toggle-device-revoke" data-id="${d.user_id}">
+            ${d.revoked ? 'Restore access' : 'Revoke access'}
+          </button>
+          <button class="btn text" style="color:var(--danger);" data-action="delete-device" data-id="${d.user_id}">Delete</button>
+        </div>` : ''}
+    </div>`).join('') + `</div>`;
+}
+
+/* ================= global click delegation ================= */
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.dataset.action;
+
+  if (action === 'toggle-sidebar') { ui.sidebarOpen = true; setSidebarOpenState(); }
+  if (action === 'close-sidebar') { ui.sidebarOpen = false; setSidebarOpenState(); }
+
+  if (action === 'open-admin-login') { openAdminLogin(); }
+  if (action === 'close-admin-login' || action === 'close-admin-login-bg') { closeAdminLogin(); }
+  if (action === 'admin-login') { adminLogin(); }
+  if (action === 'admin-forgot') { adminForgotPassword(); }
+  if (action === 'admin-signout') { adminSignOut(); }
+  if (action === 'visitor-signout') { signOutCurrentUser(); }
+  if (action === 'open-devices') { openDevicesView(); }
+  if (action === 'toggle-device-revoke') { toggleDeviceRevoke(el.dataset.id); }
+  if (action === 'delete-device') { deleteDevicePermanently(el.dataset.id); }
+  if (action === 'visitor-continue') { visitorContinue(); }
+  if (action === 'gate-admin-login') { gateAdminLogin(); }
+  if (action === 'gate-admin-forgot') { gateAdminForgot(); }
+  if (action === 'set-new-password') { setNewPassword(); }
+
+  if (!isAdmin) {
+    const guardedActions = ['start-add-chapter','submit-add-chapter','start-rename','save-rename',
+      'confirm-delete-chapter','delete-chapter','confirm-reset-all','reset-all','export-data','trigger-import',
+      'open-resource-form','submit-resource-form','edit-resource','delete-resource',
+      'open-question-form','submit-question-form','edit-question','delete-question','toggle-mastered',
+      'open-note-form','submit-note-form','edit-note','delete-note'];
+    if (guardedActions.includes(action)) return;
+  }
+
+  if (action === 'select-chapter') { mountChapter(el.dataset.id); ui.sidebarOpen = false; setSidebarOpenState(); }
+  if (action === 'start-add-chapter') { ui.addingChapter = true; renderAddArea(); focusEl('newChapterInput'); }
+  if (action === 'cancel-add-chapter') { ui.addingChapter = false; renderAddArea(); }
+  if (action === 'submit-add-chapter') { submitAddChapter(); }
+  if (action === 'start-rename') { ui.editingChapterId = el.dataset.id; renderChapterList(); focusEl('renameInput'); }
+  if (action === 'cancel-rename') { ui.editingChapterId = null; renderChapterList(); }
+  if (action === 'save-rename') { submitRename(el.dataset.id); }
+  if (action === 'confirm-delete-chapter') { ui.confirmDeleteChapterId = el.dataset.id; renderChapterList(); }
+  if (action === 'cancel-delete-chapter') { ui.confirmDeleteChapterId = null; renderChapterList(); }
+  if (action === 'delete-chapter') { deleteChapter(el.dataset.id); }
+  if (action === 'confirm-reset-all') { ui.confirmResetAll = true; renderAddArea(); }
+  if (action === 'cancel-reset-all') { ui.confirmResetAll = false; renderAddArea(); }
+  if (action === 'reset-all') { resetAll(); }
+
+  if (action === 'export-data') { exportAllData(); }
+  if (action === 'trigger-import') { document.getElementById('importFileInput').click(); }
+  if (action === 'jump-to-result') {
+    const chapterId = el.dataset.chapter, tab = el.dataset.tab;
+    searchTerm = ''; const si = document.getElementById('searchInput'); if (si) si.value = '';
+    renderSearchDropdown(null);
+    mountChapter(chapterId, tab);
+  }
+
+  if (action === 'toggle-preview') {
+    const box = document.getElementById('preview-' + el.dataset.id);
+    if (box) box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+  }
+  if (action === 'fullscreen-preview') {
+    const box = document.getElementById('preview-' + el.dataset.id);
+    if (!box) return;
+    box.style.display = 'block';
+    const req = box.requestFullscreen || box.webkitRequestFullscreen || box.msRequestFullscreen;
+    if (req) req.call(box);
+  }
+  if (action === 'select-tab') { activeTab = el.dataset.tab; refreshTabVisibility(); }
+
+  if (action === 'open-resource-form') { openResourceForm(); }
+  if (action === 'close-resource-form') { closeResourceForm(); }
+  if (action === 'edit-resource') { openResourceForm(resourcesCache.find(r=>r.id===el.dataset.id)); }
+  if (action === 'delete-resource') { deleteItem('resources', el.dataset.id, resourcesCache); }
+  if (action === 'choose-resource-file') { document.getElementById('resourceFileInput').click(); }
+  if (action === 'clear-resource-file') { pendingFile.resource = null; document.getElementById('resourceFileInput').value=''; renderResourceFileRow(); }
+  if (action === 'remove-existing-resource-file') { document.getElementById('resourceFormArea').dataset.removeFile='1'; renderResourceFileRow(); }
+  if (action === 'submit-resource-form') { submitResourceForm(); }
+
+  if (action === 'open-question-form') { openQuestionForm(); }
+  if (action === 'close-question-form') { closeQuestionForm(); }
+  if (action === 'edit-question') { openQuestionForm(questionsCache.find(q=>q.id===el.dataset.id)); }
+  if (action === 'delete-question') { deleteItem('questions', el.dataset.id, questionsCache); }
+  if (action === 'choose-question-file') { document.getElementById('questionFileInput').click(); }
+  if (action === 'clear-question-file') { pendingFile.question = null; document.getElementById('questionFileInput').value=''; renderQuestionFileRow(); }
+  if (action === 'remove-existing-question-file') { document.getElementById('questionFormArea').dataset.removeFile='1'; renderQuestionFileRow(); }
+  if (action === 'submit-question-form') { submitQuestionForm(); }
+  if (action === 'toggle-answer') { revealed[el.dataset.id] = !revealed[el.dataset.id]; renderList('questions'); }
+  if (action === 'toggle-mastered') { toggleMastered(el.dataset.id); }
+
+  if (action === 'open-note-form') { openNoteForm(); }
+  if (action === 'close-note-form') { closeNoteForm(); }
+  if (action === 'edit-note') { openNoteForm(notesCache.find(n=>n.id===el.dataset.id)); }
+  if (action === 'delete-note') { deleteItem('notes', el.dataset.id, notesCache); }
+  if (action === 'submit-note-form') { submitNoteForm(); }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) renderSearchDropdown(null);
+}, true);
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'resourceFileInput') { pendingFile.resource = e.target.files[0] || null; renderResourceFileRow(); }
+  if (e.target.id === 'questionFileInput') { pendingFile.question = e.target.files[0] || null; renderQuestionFileRow(); }
+  if (e.target.id === 'importFileInput') {
+    if (!isAdmin) return;
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const payload = JSON.parse(reader.result);
+        const count = (payload.chapters||[]).length;
+        if (!confirm(`This will add ${count} chapter(s) from the backup into your current binder (nothing existing gets deleted). Continue?`)) return;
+        await importData(payload);
+        await loadChapters();
+        renderChapterList();
+        alert('Import complete.');
+      } catch(err) { alert('Could not read that file: ' + err.message); }
+    };
+    reader.readAsText(file);
+  }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'searchInput') {
+    searchTerm = e.target.value;
+    renderChapterList();
+    clearTimeout(searchDebounceTimer);
+    const term = searchTerm.trim();
+    if (term.length < 2) { renderSearchDropdown(null); return; }
+    searchDebounceTimer = setTimeout(() => runGlobalSearch(term), 300);
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'newChapterInput') submitAddChapter();
+  if (e.key === 'Escape' && e.target.id === 'newChapterInput') { ui.addingChapter=false; renderAddArea(); }
+  if (e.key === 'Enter' && e.target.id === 'renameInput') submitRename(ui.editingChapterId);
+  if (e.key === 'Escape' && e.target.id === 'renameInput') { ui.editingChapterId=null; renderChapterList(); }
+  if (e.key === 'Escape' && e.target.id === 'searchInput') { e.target.value=''; searchTerm=''; renderChapterList(); renderSearchDropdown(null); }
+  if (e.key === 'Enter' && (e.target.id === 'adminEmail' || e.target.id === 'adminPassword')) adminLogin();
+  if (e.key === 'Enter' && e.target.id === 'visitorName') visitorContinue();
+  if (e.key === 'Enter' && (e.target.id === 'gateAdminEmail' || e.target.id === 'gateAdminPassword')) gateAdminLogin();
+  if (e.key === 'Enter' && e.target.id === 'newPassword') setNewPassword();
+});
+
+/* drag & drop chapter reorder (admin only) */
+document.addEventListener('dragstart', (e) => { if (!isAdmin) return;
+  const item = e.target.closest('.chapter-item[data-drag-id]'); if (!item) return;
+  dragSourceId = item.dataset.dragId; e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', dragSourceId); } catch(err){}
+});
+document.addEventListener('dragover', (e) => { const item = e.target.closest('.chapter-item[data-drag-id]');
+  if (!item || !dragSourceId) return; e.preventDefault(); item.classList.add('drag-over'); });
+document.addEventListener('dragleave', (e) => { const item = e.target.closest('.chapter-item[data-drag-id]');
+  if (item) item.classList.remove('drag-over'); });
+document.addEventListener('drop', (e) => { const item = e.target.closest('.chapter-item[data-drag-id]');
+  if (!item || !dragSourceId) return; e.preventDefault(); item.classList.remove('drag-over');
+  const targetId = item.dataset.dragId;
+  if (targetId !== dragSourceId) reorderChapters(dragSourceId, targetId);
+  dragSourceId = null;
+});
+document.addEventListener('dragend', () => {
+  document.querySelectorAll('.chapter-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  dragSourceId = null;
+});
+
+function focusEl(id){ setTimeout(()=>{ const el = document.getElementById(id); if (el) el.focus(); }, 30); }
+
+/* ================= shell / sidebar / main ================= */
+function renderShell(){
+  resetInactivityTimer();
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+  app.innerHTML = `<div id="overlay"></div><aside class="sidebar" id="sidebar"></aside><main class="main" id="main"></main>`;
+  renderSidebarShell();
+  renderMainInto();
+}
+
+function renderSidebarShell(){
+  const el = document.getElementById('sidebar');
+  if (!el) return;
+  el.className = 'sidebar' + (ui.sidebarOpen ? ' open' : '');
+  el.innerHTML = `
+    <div class="brand">
+      <span class="serif brand-title">Study Binder</span>
+      <button class="close-btn" data-action="close-sidebar">&#10005;</button>
+    </div>
+    <div class="brand-sub">Organize every chapter in one place</div>
+    <span class="role-badge ${isAdmin?'admin':'viewer'}">${isAdmin ? '&#128273; Admin' : '&#128065; Viewing only'}</span>
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="Search everything&hellip;" autocomplete="off" />
+      <div id="searchDropdown"></div>
+    </div>
+    ${isAdmin ? `<button class="nav-btn" data-action="open-devices">&#128241; Devices</button>` : ''}
+    <div class="chapter-list" id="chapterListContainer"></div>
+    <div class="add-chapter" id="addChapterArea"></div>
+  `;
+  renderChapterList();
+  renderAddArea();
+}
+
+function setSidebarOpenState(){
+  const el = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  if (el) el.className = 'sidebar' + (ui.sidebarOpen ? ' open' : '');
+  if (overlay) overlay.outerHTML = ui.sidebarOpen ? '<div class="overlay" id="overlay" data-action="close-sidebar"></div>' : '<div id="overlay"></div>';
+}
+
+function renderChapterList(){
+  const el = document.getElementById('chapterListContainer');
+  if (!el) return;
+  const term = searchTerm.trim().toLowerCase();
+  const visible = term ? chapters.filter(c => c.title.toLowerCase().includes(term)) : chapters;
+
+  let rows = '';
+  if (chapters.length === 0) {
+    rows = `<div style="font-size:13px;color:#7C8794;padding:10px 4px;">No chapters yet${isAdmin ? '. Add your first one below.' : ' yet.'}</div>`;
+  } else if (visible.length === 0) {
+    rows = '<div style="font-size:13px;color:#7C8794;padding:10px 4px;">No chapters match your search.</div>';
+  } else {
+    visible.forEach((c) => {
+      const idx = chapters.indexOf(c);
+      if (ui.editingChapterId === c.id) {
+        rows += `
+          <div class="rename-row">
+            <input id="renameInput" type="text" value="${esc(c.title)}" />
+            <button class="icon-btn" data-action="save-rename" data-id="${c.id}">&#10003;</button>
+            <button class="icon-btn" data-action="cancel-rename">&#10005;</button>
+          </div>`;
+      } else {
+        rows += `
+          <div class="chapter-item ${activeChapterId===c.id && currentView==='chapter' ?'active':''}" ${isAdmin?`draggable="true" data-drag-id="${c.id}"`:''} data-action="select-chapter" data-id="${c.id}">
+            <span class="chapter-num">${String(idx+1).padStart(2,'0')}</span>
+            <span class="chapter-title">${esc(c.title)}</span>
+            ${isAdmin ? `<span class="chapter-actions">
+              <button class="icon-btn" data-action="start-rename" data-id="${c.id}">&#9998;</button>
+              <button class="icon-btn" data-action="confirm-delete-chapter" data-id="${c.id}">&#128465;</button>
+            </span>` : ''}
+          </div>`;
+      }
+      if (ui.confirmDeleteChapterId === c.id) {
+        rows += `
+          <div class="inline-confirm">
+            <p>Delete "${esc(c.title)}" and everything in it?</p>
+            <div class="mini-row">
+              <button class="mini-btn ghost" data-action="cancel-delete-chapter">Cancel</button>
+              <button class="mini-btn danger" data-action="delete-chapter" data-id="${c.id}">Delete</button>
+            </div>
+          </div>`;
+      }
+    });
+  }
+  el.innerHTML = rows;
+}
+
+function renderAddArea(){
+  const el = document.getElementById('addChapterArea');
+  if (!el) return;
+
+  if (!isAdmin) {
+    el.innerHTML = `
+      <button class="sidebar-footer-link" data-action="open-admin-login">&#128273; Admin sign in</button>
+      <button class="sidebar-footer-link" data-action="visitor-signout">Sign out</button>
+    `;
+    return;
+  }
+
+  const addAreaHtml = ui.addingChapter ? `
+    <div class="add-form">
+      <input id="newChapterInput" type="text" placeholder="Chapter title" />
+      <div class="mini-row">
+        <button class="mini-btn ghost" data-action="cancel-add-chapter">Cancel</button>
+        <button class="mini-btn primary" data-action="submit-add-chapter">Add</button>
+      </div>
+    </div>` : `<button class="add-btn" data-action="start-add-chapter">&#43; New chapter</button>`;
+
+  let resetHtml = '';
+  if (chapters.length > 0) {
+    resetHtml = ui.confirmResetAll ? `
+      <div class="inline-confirm">
+        <p>Erase all chapters and their content? This can't be undone.</p>
+        <div class="mini-row">
+          <button class="mini-btn ghost" data-action="cancel-reset-all">Cancel</button>
+          <button class="mini-btn danger" data-action="reset-all">Erase all</button>
+        </div>
+      </div>` : `<button class="sidebar-footer-link" data-action="confirm-reset-all">Clear all data</button>`;
+  }
+
+  el.innerHTML = `
+    ${addAreaHtml}
+    ${resetHtml}
+    <button class="sidebar-footer-link" data-action="export-data">&#11015; Backup my data</button>
+    <button class="sidebar-footer-link" data-action="trigger-import">&#11014; Restore from backup</button>
+    <input type="file" id="importFileInput" accept=".json" style="display:none" />
+    <div class="conn-status"><span class="conn-dot"></span>Signed in as admin</div>
+    <button class="sidebar-footer-link" data-action="admin-signout">Sign out of admin</button>
+  `;
+  if (ui.addingChapter) focusEl('newChapterInput');
+}
+
+/* ---- search ---- */
+function chapterTitleOf(id){ const c = chapters.find(c=>c.id===id); return c ? c.title : ''; }
+async function runGlobalSearch(term){
+  const pattern = `%${term}%`;
+  const [r, q, n] = await Promise.all([
+    sbClient.from('resources').select('id,title,chapter_id').ilike('title', pattern).limit(6),
+    sbClient.from('questions').select('id,question,chapter_id').ilike('question', pattern).limit(6),
+    sbClient.from('notes').select('id,title,chapter_id').ilike('title', pattern).limit(6),
+  ]);
+  if (searchTerm.trim() !== term) return;
+  renderSearchDropdown({ resources: r.data||[], questions: q.data||[], notes: n.data||[] });
+}
+function renderSearchDropdown(results){
+  const el = document.getElementById('searchDropdown');
+  if (!el) return;
+  if (!results) { el.innerHTML = ''; el.classList.remove('open'); return; }
+  const groups = [];
+  if (results.resources.length) groups.push(['Resources', results.resources.map(r=>({label:r.title, chapterId:r.chapter_id, tab:'resources'}))]);
+  if (results.questions.length) groups.push(['Questions', results.questions.map(q=>({label:q.question, chapterId:q.chapter_id, tab:'questions'}))]);
+  if (results.notes.length) groups.push(['Notes', results.notes.map(n=>({label:n.title, chapterId:n.chapter_id, tab:'notes'}))]);
+  if (groups.length === 0) { el.innerHTML = '<div class="search-empty">No matches outside chapter titles</div>'; el.classList.add('open'); return; }
+  el.innerHTML = groups.map(([label, items]) => `
+    <div class="search-group-label">${label}</div>
+    ${items.map(it => `<div class="search-result-item" data-action="jump-to-result" data-chapter="${it.chapterId}" data-tab="${it.tab}">
+      <span>${esc(it.label)}</span><span class="search-result-chapter">${esc(chapterTitleOf(it.chapterId))}</span>
+    </div>`).join('')}
+  `).join('');
+  el.classList.add('open');
+}
+
+/* ---- drag reorder ---- */
+function reorderChapters(fromId, toId){
+  const fromIdx = chapters.findIndex(c=>c.id===fromId), toIdx = chapters.findIndex(c=>c.id===toId);
+  if (fromIdx===-1 || toIdx===-1) return;
+  const [moved] = chapters.splice(fromIdx, 1);
+  chapters.splice(toIdx, 0, moved);
+  renderChapterList();
+  Promise.all(chapters.map((c, idx) => sbClient.from('chapters').update({ position: idx }).eq('id', c.id)));
+}
+
+/* ---- main area ---- */
+function renderMainInto(){
+  const el = document.getElementById('main');
+  if (!el) return;
+
+  if (currentView === 'devices') {
+    el.innerHTML = `
+      <div class="mobile-bar"><button data-action="toggle-sidebar">&#9776;</button><span>Devices</span></div>
+      <p class="chapter-eyebrow">Admin</p>
+      <h1 class="serif" style="font-size:28px;margin:0 0 6px 0;">Connected devices</h1>
+      <p style="color:var(--text-dim);font-size:14.5px;max-width:600px;margin:0 0 22px 0;">
+        Every browser that has opened this site shows up here, labeled by browser and operating system
+        (websites can't see real device names). Revoking a device blocks it from reading or writing your data right away.
+      </p>
+      <div id="devicesList"><div class="loading">Loading&hellip;</div></div>
+    `;
+    return;
+  }
+
+  const chapter = chapters.find(c => c.id === activeChapterId);
+
+  if (!chapter) {
+    el.innerHTML = `
+      <div class="mobile-bar"><button data-action="toggle-sidebar">&#9776;</button><span>Study Binder</span></div>
+      <div class="empty-state">
+        <h2 class="serif">Pick a chapter${isAdmin ? ', or start one' : ''}</h2>
+        <p>Each chapter holds its own resources, questions, and notes, so material stays organized exactly the way the course is structured.</p>
+        ${isAdmin && chapters.length===0 ? `<button class="btn primary" data-action="start-add-chapter">&#43; Create your first chapter</button>` : ''}
+      </div>
+    `;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="mobile-bar"><button data-action="toggle-sidebar">&#9776;</button><span>${esc(chapter.title)}</span></div>
+    <div class="chapter-header">
+      <div>
+        <p class="chapter-eyebrow">Chapter ${String(chapters.findIndex(c=>c.id===chapter.id)+1).padStart(2,'0')}</p>
+        <h1 class="serif">${esc(chapter.title)}</h1>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab ${activeTab==='resources'?'active':''}" data-action="select-tab" data-tab="resources">Resources</button>
+      <button class="tab ${activeTab==='questions'?'active':''}" data-action="select-tab" data-tab="questions">Questions</button>
+      <button class="tab ${activeTab==='notes'?'active':''}" data-action="select-tab" data-tab="notes">Notes</button>
+    </div>
+    <div class="panel ${activeTab==='resources'?'active':''}" id="panel-resources">
+      <div id="resourceFormArea">${isAdmin ? `<button class="btn primary" data-action="open-resource-form">&#43; Add resource</button>` : ''}</div>
+      <div id="resourceList"><div class="loading">Loading&hellip;</div></div>
+    </div>
+    <div class="panel ${activeTab==='questions'?'active':''}" id="panel-questions">
+      <div id="questionFormArea">${isAdmin ? `<button class="btn primary" data-action="open-question-form">&#43; Add question</button>` : ''}</div>
+      <div id="questionList"><div class="loading">Loading&hellip;</div></div>
+    </div>
+    <div class="panel ${activeTab==='notes'?'active':''}" id="panel-notes">
+      <div id="noteFormArea">${isAdmin ? `<button class="btn primary" data-action="open-note-form">&#43; Add note</button>` : ''}</div>
+      <div id="noteList"><div class="loading">Loading&hellip;</div></div>
+    </div>
+  `;
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action="select-tab"]');
+  if (el) { activeTab = el.dataset.tab; refreshTabVisibility(); }
+}, true);
+
+function refreshTabVisibility(){
+  ['resources','questions','notes'].forEach(k => {
+    const p = document.getElementById('panel-'+k); if (p) p.className = 'panel' + (activeTab===k ? ' active' : '');
+    const t = document.querySelector('.tab[data-tab="'+k+'"]'); if (t) t.className = 'tab' + (activeTab===k ? ' active' : '');
+  });
+}
+
+
+/* ---- chapters CRUD (admin only, guarded above) ---- */
+async function submitAddChapter(){
+  const input = document.getElementById('newChapterInput');
+  const title = input ? input.value.trim() : '';
+  if (!title) return;
+  const maxPos = chapters.reduce((m,c) => Math.max(m, (c.position ?? 0)), 0);
+  let { data, error } = await sbClient.from('chapters').insert({ title, position: maxPos + 1 }).select().single();
+  if (error && /position/i.test(error.message)) ({ data, error } = await sbClient.from('chapters').insert({ title }).select().single());
+  if (error) { alert('Could not add chapter: ' + error.message); return; }
+  ui.addingChapter = false;
+  await loadChapters();
+  renderAddArea();
+  mountChapter(data.id);
+}
+async function submitRename(id){
+  const input = document.getElementById('renameInput');
+  const title = input ? input.value.trim() : '';
+  ui.editingChapterId = null;
+  if (!title) { renderChapterList(); return; }
+  await sbClient.from('chapters').update({ title }).eq('id', id);
+  await loadChapters();
+  renderChapterList();
+}
+async function deleteChapter(id){
+  ui.confirmDeleteChapterId = null;
+  const [r, q] = await Promise.all([
+    sbClient.from('resources').select('file_path').eq('chapter_id', id),
+    sbClient.from('questions').select('file_path').eq('chapter_id', id),
+  ]);
+  const paths = [...(r.data||[]), ...(q.data||[])].map(x => x.file_path).filter(Boolean);
+  if (paths.length) await sbClient.storage.from(BUCKET).remove(paths);
+  await sbClient.from('chapters').delete().eq('id', id);
+  if (activeChapterId === id) activeChapterId = null;
+  await loadChapters();
+  renderChapterList();
+  renderMainInto();
+}
+async function resetAll(){
+  ui.confirmResetAll = false;
+  const ids = chapters.map(c => c.id);
+  for (const id of ids) await deleteChapter(id);
+  await loadChapters();
+  renderChapterList(); renderAddArea(); renderMainInto();
+}
+
+/* ---- backup / restore ---- */
+async function exportAllData(){
+  const [ch, res, qs, nt] = await Promise.all([
+    sbClient.from('chapters').select('*'), sbClient.from('resources').select('*'),
+    sbClient.from('questions').select('*'), sbClient.from('notes').select('*'),
+  ]);
+  const payload = { exportedAt: new Date().toISOString(), chapters: ch.data||[], resources: res.data||[], questions: qs.data||[], notes: nt.data||[] };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `study-binder-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+async function importData(payload){
+  const idMap = {};
+  for (const c of (payload.chapters||[])) {
+    const { data } = await sbClient.from('chapters').insert({ title: c.title }).select().single();
+    if (data) idMap[c.id] = data.id;
+  }
+  for (const r of (payload.resources||[])) { if (!idMap[r.chapter_id]) continue;
+    await sbClient.from('resources').insert({ chapter_id: idMap[r.chapter_id], title: r.title, url: r.url, description: r.description, file_url: r.file_url, file_name: r.file_name, file_path: r.file_path, file_size: r.file_size }); }
+  for (const q of (payload.questions||[])) { if (!idMap[q.chapter_id]) continue;
+    await sbClient.from('questions').insert({ chapter_id: idMap[q.chapter_id], question: q.question, answer: q.answer, mastered: q.mastered, file_url: q.file_url, file_name: q.file_name, file_path: q.file_path, file_size: q.file_size }); }
+  for (const n of (payload.notes||[])) { if (!idMap[n.chapter_id]) continue;
+    await sbClient.from('notes').insert({ chapter_id: idMap[n.chapter_id], title: n.title, content: n.content }); }
+}
+
+/* ---- generic item delete ---- */
+async function deleteItem(kind, id, cache){
+  const item = cache.find(i => i.id === id);
+  if (item && item.file_path) await sbClient.storage.from(BUCKET).remove([item.file_path]);
+  await sbClient.from(kind).delete().eq('id', id);
+  await loadChapterItems(activeChapterId);
+  renderList(kind);
+}
+async function uploadFile(path, file){
+  const { error } = await sbClient.storage.from(BUCKET).upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = sbClient.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+function renderList(kind){
+  if (kind === 'resources') return renderResourceList();
+  if (kind === 'questions') return renderQuestionList();
+  if (kind === 'notes') return renderNoteList();
+}
+function fileViewHtml(it){
+  if (!it.file_url) return '';
+  const ext = fileExt(it.file_name);
+  const previewable = isImageExt(ext) || isPdfExt(ext);
+  let html = `<div class="file-row-view">`;
+  if (isAdmin) {
+    html += `<a href="${esc(it.file_url)}" target="_blank" rel="noreferrer" class="file-chip">&#128206; ${esc(it.file_name||'file')} <span class="fsize">${formatBytes(it.file_size)}</span></a>`;
+  } else {
+    html += `<span class="file-chip" style="cursor:default;">&#128206; ${esc(it.file_name||'file')} <span class="fsize">${formatBytes(it.file_size)}</span></span>`;
+  }
+  if (previewable) {
+    html += `<button class="preview-toggle" data-action="toggle-preview" data-id="${it.id}">View</button>
+    <button class="preview-toggle" data-action="fullscreen-preview" data-id="${it.id}">&#9974; Fullscreen</button>
+    <div class="preview-box" id="preview-${it.id}" style="display:none;" oncontextmenu="return false;">
+      ${isImageExt(ext) ? `<img src="${esc(it.file_url)}" alt="${esc(it.file_name)}" draggable="false" />` : `<iframe src="${esc(it.file_url)}#toolbar=0&navpanes=0" allowfullscreen></iframe>`}
+    </div>`;
+  } else if (!isAdmin) {
+    html += `<div class="file-note">This file type can't be shown in the browser, so it isn't viewable here.</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+/* ================= resources ================= */
+function openResourceForm(item){
+  if (!isAdmin) return;
+  const box = document.getElementById('resourceFormArea');
+  box.dataset.removeFile = ''; box.__editingItem = item || null; pendingFile.resource = null;
+  box.innerHTML = `
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="field"><label>Title</label><input type="text" id="resTitle" value="${item?esc(item.title):''}" placeholder="e.g. Lecture slides, Chapter 3 PDF" /></div>
+        <div class="field"><label>Link (optional)</label><input type="text" id="resUrl" value="${item?esc(item.url||''):''}" placeholder="Paste a URL to the resource" /></div>
+        <div class="field"><label>Notes (optional)</label><textarea id="resDesc" placeholder="What this resource covers">${item?esc(item.description||''):''}</textarea></div>
+        <div class="field"><label>Attach a file (optional)</label><div id="resFileRow"></div><input type="file" id="resourceFileInput" style="display:none" /></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" data-action="submit-resource-form">&#10003; ${item?'Save changes':'Add resource'}</button>
+        <button class="btn text" data-action="close-resource-form">Cancel</button>
+      </div>
+      <div id="resUploadingNote"></div>
+    </div>`;
+  renderResourceFileRow();
+  focusEl('resTitle');
+}
+function closeResourceForm(){
+  pendingFile.resource = null;
+  document.getElementById('resourceFormArea').innerHTML = isAdmin ? `<button class="btn primary" data-action="open-resource-form">&#43; Add resource</button>` : '';
+}
+function renderResourceFileRow(){
+  const row = document.getElementById('resFileRow'); if (!row) return;
+  const box = document.getElementById('resourceFormArea'); const editingItem = box.__editingItem; const removing = box.dataset.removeFile === '1';
+  let html = '';
+  if (pendingFile.resource) html = `<div class="file-row"><span class="file-chosen">${esc(pendingFile.resource.name)} (${formatBytes(pendingFile.resource.size)}) <button data-action="clear-resource-file">remove</button></span></div>`;
+  else if (editingItem && editingItem.file_name && !removing) html = `<div class="file-row"><span class="file-chosen">Current: ${esc(editingItem.file_name)} <button data-action="remove-existing-resource-file">remove</button></span></div>`;
+  else html = `<button class="file-choose-btn" type="button" data-action="choose-resource-file">Choose file</button>`;
+  row.innerHTML = html;
+}
+async function submitResourceForm(){
+  const box = document.getElementById('resourceFormArea'); const editingItem = box.__editingItem;
+  const title = document.getElementById('resTitle').value.trim();
+  const url = document.getElementById('resUrl').value.trim();
+  const description = document.getElementById('resDesc').value.trim();
+  if (!title) return;
+  const submitBtn = box.querySelector('[data-action="submit-resource-form"]'); submitBtn.disabled = true;
+  const file = pendingFile.resource; const removeFile = box.dataset.removeFile === '1';
+  const data = { title, url, description };
+  try {
+    const id = editingItem ? editingItem.id : newId();
+    if (editingItem && removeFile && editingItem.file_path) {
+      await sbClient.storage.from(BUCKET).remove([editingItem.file_path]);
+      data.file_url = null; data.file_name = null; data.file_path = null; data.file_size = null;
+    }
+    if (file) {
+      document.getElementById('resUploadingNote').innerHTML = `<div class="uploading-note"><span class="spinner"></span>Uploading file&hellip;</div>`;
+      const path = `resources/${activeChapterId}/${id}/${file.name}`;
+      const url2 = await uploadFile(path, file);
+      data.file_url = url2; data.file_name = file.name; data.file_path = path; data.file_size = file.size;
+    }
+    if (editingItem) await sbClient.from('resources').update(data).eq('id', id);
+    else { data.id = id; data.chapter_id = activeChapterId; await sbClient.from('resources').insert(data); }
+    closeResourceForm();
+    await loadChapterItems(activeChapterId);
+    renderList('resources');
+  } catch(e) { submitBtn.disabled = false; alert('Could not save: ' + e.message); }
+}
+function renderResourceList(){
+  const el = document.getElementById('resourceList'); if (!el) return;
+  if (resourcesCache.length === 0) { el.innerHTML = `<div class="panel-empty"><strong>No resources here yet</strong>${isAdmin?'Add links, files, or notes on where material lives, so everything for this chapter stays in one place.':''}</div>`; return; }
+  el.innerHTML = `<div class="list">` + resourcesCache.map(it => `
+    <div class="item-card">
+      <div class="item-top">
+        <div style="flex:1;min-width:0;">
+          <p class="item-title">${esc(it.title)}</p>
+          ${it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noreferrer" class="item-link">${esc(it.url)}</a>` : ''}
+          ${it.description ? `<p class="item-desc">${esc(it.description)}</p>` : ''}
+          ${fileViewHtml(it)}
+        </div>
+        ${isAdmin ? `<div class="item-actions">
+          <button class="icon-btn dim" data-action="edit-resource" data-id="${it.id}">&#9998;</button>
+          <button class="icon-btn dim" data-action="delete-resource" data-id="${it.id}">&#128465;</button>
+        </div>` : ''}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+
+/* ================= questions ================= */
+function openQuestionForm(item){
+  if (!isAdmin) return;
+  const box = document.getElementById('questionFormArea');
+  box.dataset.removeFile = ''; box.__editingItem = item || null; pendingFile.question = null;
+  box.innerHTML = `
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="field"><label>Question</label><textarea id="qQuestion" placeholder="What question should this chapter help you answer?">${item?esc(item.question):''}</textarea></div>
+        <div class="field"><label>Answer (optional)</label><textarea id="qAnswer" placeholder="Write the answer so you can self-test later">${item?esc(item.answer||''):''}</textarea></div>
+        <div class="field"><label>Attach a file (optional)</label><div id="qFileRow"></div><input type="file" id="questionFileInput" style="display:none" /></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" data-action="submit-question-form">&#10003; ${item?'Save changes':'Add question'}</button>
+        <button class="btn text" data-action="close-question-form">Cancel</button>
+      </div>
+      <div id="qUploadingNote"></div>
+    </div>`;
+  renderQuestionFileRow();
+  focusEl('qQuestion');
+}
+function closeQuestionForm(){
+  pendingFile.question = null;
+  document.getElementById('questionFormArea').innerHTML = isAdmin ? `<button class="btn primary" data-action="open-question-form">&#43; Add question</button>` : '';
+}
+function renderQuestionFileRow(){
+  const row = document.getElementById('qFileRow'); if (!row) return;
+  const box = document.getElementById('questionFormArea'); const editingItem = box.__editingItem; const removing = box.dataset.removeFile === '1';
+  let html = '';
+  if (pendingFile.question) html = `<div class="file-row"><span class="file-chosen">${esc(pendingFile.question.name)} (${formatBytes(pendingFile.question.size)}) <button data-action="clear-question-file">remove</button></span></div>`;
+  else if (editingItem && editingItem.file_name && !removing) html = `<div class="file-row"><span class="file-chosen">Current: ${esc(editingItem.file_name)} <button data-action="remove-existing-question-file">remove</button></span></div>`;
+  else html = `<button class="file-choose-btn" type="button" data-action="choose-question-file">Choose file</button>`;
+  row.innerHTML = html;
+}
+async function submitQuestionForm(){
+  const box = document.getElementById('questionFormArea'); const editingItem = box.__editingItem;
+  const question = document.getElementById('qQuestion').value.trim();
+  const answer = document.getElementById('qAnswer').value.trim();
+  if (!question) return;
+  const submitBtn = box.querySelector('[data-action="submit-question-form"]'); submitBtn.disabled = true;
+  const file = pendingFile.question; const removeFile = box.dataset.removeFile === '1';
+  const data = { question, answer };
+  try {
+    const id = editingItem ? editingItem.id : newId();
+    if (editingItem) data.mastered = editingItem.mastered || false;
+    if (editingItem && removeFile && editingItem.file_path) {
+      await sbClient.storage.from(BUCKET).remove([editingItem.file_path]);
+      data.file_url = null; data.file_name = null; data.file_path = null; data.file_size = null;
+    }
+    if (file) {
+      document.getElementById('qUploadingNote').innerHTML = `<div class="uploading-note"><span class="spinner"></span>Uploading file&hellip;</div>`;
+      const path = `questions/${activeChapterId}/${id}/${file.name}`;
+      const url2 = await uploadFile(path, file);
+      data.file_url = url2; data.file_name = file.name; data.file_path = path; data.file_size = file.size;
+    }
+    if (editingItem) await sbClient.from('questions').update(data).eq('id', id);
+    else { data.id = id; data.chapter_id = activeChapterId; data.mastered = false; await sbClient.from('questions').insert(data); }
+    closeQuestionForm();
+    await loadChapterItems(activeChapterId);
+    renderList('questions');
+  } catch(e) { submitBtn.disabled = false; alert('Could not save: ' + e.message); }
+}
+async function toggleMastered(id){
+  const item = questionsCache.find(q => q.id === id); if (!item) return;
+  await sbClient.from('questions').update({ mastered: !item.mastered }).eq('id', id);
+  await loadChapterItems(activeChapterId);
+  renderList('questions');
+}
+function renderQuestionList(){
+  const el = document.getElementById('questionList'); if (!el) return;
+  if (questionsCache.length === 0) { el.innerHTML = `<div class="panel-empty"><strong>No questions yet</strong>${isAdmin?'Add the questions you expect to be tested on, with answers, and quiz yourself by revealing them one at a time.':''}</div>`; return; }
+  el.innerHTML = `<div class="list">` + questionsCache.map(it => `
+    <div class="item-card">
+      <div class="item-top">
+        <div style="flex:1;min-width:0;">
+          <p class="item-title">${esc(it.question)}</p>
+          ${it.answer ? `
+            <button class="answer-toggle" data-action="toggle-answer" data-id="${it.id}">${revealed[it.id]?'Hide answer':'Reveal answer'}</button>
+            ${revealed[it.id] ? `<div class="answer-box">${esc(it.answer)}</div>` : ''}
+          ` : ''}
+          ${fileViewHtml(it)}
+          <div class="mastered-row">
+            <input type="checkbox" ${it.mastered?'checked':''} data-action="${isAdmin?'toggle-mastered':''}" data-id="${it.id}" ${isAdmin?'':'disabled'} />
+            Comfortable with this one
+          </div>
+        </div>
+        ${isAdmin ? `<div class="item-actions">
+          <button class="icon-btn dim" data-action="edit-question" data-id="${it.id}">&#9998;</button>
+          <button class="icon-btn dim" data-action="delete-question" data-id="${it.id}">&#128465;</button>
+        </div>` : ''}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+
+/* ================= notes ================= */
+function openNoteForm(item){
+  if (!isAdmin) return;
+  const box = document.getElementById('noteFormArea');
+  box.__editingItem = item || null;
+  box.innerHTML = `
+    <div class="form-card">
+      <div class="form-grid">
+        <div class="field"><label>Title</label><input type="text" id="noteTitle" value="${item?esc(item.title):''}" placeholder="e.g. Key definitions" /></div>
+        <div class="field"><label>Note</label><textarea id="noteContent" style="min-height:120px" placeholder="Write your notes for this chapter">${item?esc(item.content||''):''}</textarea></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn primary" data-action="submit-note-form">&#10003; ${item?'Save changes':'Add note'}</button>
+        <button class="btn text" data-action="close-note-form">Cancel</button>
+      </div>
+    </div>`;
+  focusEl('noteTitle');
+}
+function closeNoteForm(){
+  document.getElementById('noteFormArea').innerHTML = isAdmin ? `<button class="btn primary" data-action="open-note-form">&#43; Add note</button>` : '';
+}
+async function submitNoteForm(){
+  const box = document.getElementById('noteFormArea'); const editingItem = box.__editingItem;
+  const title = document.getElementById('noteTitle').value.trim() || 'Untitled note';
+  const content = document.getElementById('noteContent').value.trim();
+  if (!title && !content) return;
+  if (editingItem) await sbClient.from('notes').update({ title, content }).eq('id', editingItem.id);
+  else await sbClient.from('notes').insert({ id: newId(), chapter_id: activeChapterId, title, content });
+  closeNoteForm();
+  await loadChapterItems(activeChapterId);
+  renderList('notes');
+}
+function renderNoteList(){
+  const el = document.getElementById('noteList'); if (!el) return;
+  if (notesCache.length === 0) { el.innerHTML = `<div class="panel-empty"><strong>No notes yet</strong>${isAdmin?'Jot down summaries, definitions, or anything worth remembering from this chapter.':''}</div>`; return; }
+  el.innerHTML = `<div class="list">` + notesCache.map(it => `
+    <div class="item-card">
+      <div class="item-top">
+        <div style="flex:1;min-width:0;">
+          <p class="item-title">${esc(it.title)}</p>
+          ${it.content ? `<p class="item-desc">${esc(it.content)}</p>` : ''}
+        </div>
+        ${isAdmin ? `<div class="item-actions">
+          <button class="icon-btn dim" data-action="edit-note" data-id="${it.id}">&#9998;</button>
+          <button class="icon-btn dim" data-action="delete-note" data-id="${it.id}">&#128465;</button>
+        </div>` : ''}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .then(() => console.log("Study Binder PWA service worker registered."))
+      .catch(err => console.error("PWA registration failed:", err));
+  });
+}
+</script>
+
+</body>
+</html>

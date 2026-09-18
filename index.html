@@ -170,18 +170,6 @@
   .preview-box { margin-top: 10px; max-width: 100%; }
   .preview-box img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; user-select: none; }
   .preview-box iframe { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 8px; }
-  .pdf-viewer { width: 100%; background: #2B2F33; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .pdf-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 10px; background: #1B2430; color: #fff; }
-  .pdf-toolbar-group { display: flex; align-items: center; gap: 6px; }
-  .pdf-toolbar button { border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08); color: #fff; border-radius: 6px; min-width: 34px; min-height: 32px; padding: 5px 9px; cursor: pointer; font-family: inherit; }
-  .pdf-toolbar button:hover { background: rgba(255,255,255,0.16); }
-  .pdf-toolbar button:disabled { opacity: 0.45; cursor: default; }
-  .pdf-page-label { font-size: 12.5px; white-space: nowrap; }
-  .pdf-page-input { width: 52px; min-height: 30px; border: 1px solid rgba(255,255,255,0.22); border-radius: 6px; background: rgba(255,255,255,0.08); color: #fff; text-align: center; padding: 5px; }
-  .pdf-canvas-wrap { min-height: 320px; max-height: 72vh; overflow: auto; padding: 14px; display: flex; justify-content: center; align-items: flex-start; }
-  .pdf-canvas-wrap canvas { display: block; max-width: none; height: auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
-  .pdf-loading { color: #fff; font-size: 13px; text-align: center; padding: 36px 16px; }
-  .pdf-error { color: #ffd9d4; font-size: 13px; line-height: 1.45; text-align: center; padding: 28px 16px; }
   .preview-box:fullscreen, .preview-box:-webkit-full-screen { background: #000; display: flex !important; align-items: center; justify-content: center; }
   .preview-box:fullscreen img, .preview-box:-webkit-full-screen img { max-width: 100vw; max-height: 100vh; border: none; border-radius: 0; object-fit: contain; }
   .preview-box:fullscreen iframe, .preview-box:-webkit-full-screen iframe { width: 100vw; height: 100vh; border: none; border-radius: 0; }
@@ -775,29 +763,15 @@ document.addEventListener('click', (e) => {
 
   if (action === 'toggle-preview') {
     const box = document.getElementById('preview-' + el.dataset.id);
-    if (box) {
-      const opening = (box.style.display === 'none' || !box.style.display);
-      box.style.display = opening ? 'block' : 'none';
-      if (opening) {
-        const viewer = document.getElementById('pdf-viewer-' + el.dataset.id);
-        if (viewer) openPdfPreview(el.dataset.id);
-      }
-    }
+    if (box) box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
   }
   if (action === 'fullscreen-preview') {
     const box = document.getElementById('preview-' + el.dataset.id);
     if (!box) return;
     box.style.display = 'block';
-    const viewer = document.getElementById('pdf-viewer-' + el.dataset.id);
-    if (viewer) openPdfPreview(el.dataset.id);
     const req = box.requestFullscreen || box.webkitRequestFullscreen || box.msRequestFullscreen;
     if (req) req.call(box);
   }
-  if (action === 'pdf-prev') { changePdfPage(el.dataset.id, -1); }
-  if (action === 'pdf-next') { changePdfPage(el.dataset.id, 1); }
-  if (action === 'pdf-zoom-in') { changePdfZoom(el.dataset.id, 0.15); }
-  if (action === 'pdf-zoom-out') { changePdfZoom(el.dataset.id, -0.15); }
-  if (action === 'pdf-fit') { fitPdfToWidth(el.dataset.id); }
   if (action === 'select-tab') { activeTab = el.dataset.tab; refreshTabVisibility(); }
 
   if (action === 'open-resource-form') { openResourceForm(); }
@@ -1249,170 +1223,17 @@ function fileViewHtml(it){
     html += `<span class="file-chip" style="cursor:default;">&#128206; ${esc(it.file_name||'file')} <span class="fsize">${formatBytes(it.file_size)}</span></span>`;
   }
   if (previewable) {
-    if (isPdfExt(ext)) {
-      html += `<button class="preview-toggle" data-action="toggle-preview" data-id="${it.id}">View</button>
-      <button class="preview-toggle" data-action="fullscreen-preview" data-id="${it.id}">&#9974; Fullscreen</button>
-      <div class="preview-box" id="preview-${it.id}" style="display:none;" oncontextmenu="return false;">
-        <div class="pdf-viewer" id="pdf-viewer-${it.id}" data-pdf-url="${esc(it.file_url)}" data-pdf-page="1" data-pdf-scale="1.15">
-          <div class="pdf-toolbar">
-            <div class="pdf-toolbar-group">
-              <button type="button" data-action="pdf-prev" data-id="${it.id}" title="Previous page">&#10094;</button>
-              <input class="pdf-page-input" id="pdf-page-${it.id}" type="number" min="1" value="1" data-action="pdf-page-input" data-id="${it.id}" aria-label="PDF page number">
-              <span class="pdf-page-label">/ <span id="pdf-total-${it.id}">-</span></span>
-              <button type="button" data-action="pdf-next" data-id="${it.id}" title="Next page">&#10095;</button>
-            </div>
-            <div class="pdf-toolbar-group">
-              <button type="button" data-action="pdf-zoom-out" data-id="${it.id}" title="Zoom out">&#8722;</button>
-              <button type="button" data-action="pdf-zoom-in" data-id="${it.id}" title="Zoom in">&#43;</button>
-              <button type="button" data-action="pdf-fit" data-id="${it.id}" title="Fit to width">Fit</button>
-            </div>
-          </div>
-          <div class="pdf-canvas-wrap" id="pdf-canvas-wrap-${it.id}">
-            <div class="pdf-loading">Preparing PDF&hellip;</div>
-          </div>
-        </div>
-      </div>`;
-    } else {
-      html += `<button class="preview-toggle" data-action="toggle-preview" data-id="${it.id}">View</button>
-      <button class="preview-toggle" data-action="fullscreen-preview" data-id="${it.id}">&#9974; Fullscreen</button>
-      <div class="preview-box" id="preview-${it.id}" style="display:none;" oncontextmenu="return false;">
-        <img src="${esc(it.file_url)}" alt="${esc(it.file_name)}" draggable="false" />
-      </div>`;
-    }
+    html += `<button class="preview-toggle" data-action="toggle-preview" data-id="${it.id}">View</button>
+    <button class="preview-toggle" data-action="fullscreen-preview" data-id="${it.id}">&#9974; Fullscreen</button>
+    <div class="preview-box" id="preview-${it.id}" style="display:none;" oncontextmenu="return false;">
+      ${isImageExt(ext) ? `<img src="${esc(it.file_url)}" alt="${esc(it.file_name)}" draggable="false" />` : `<iframe src="${esc(it.file_url)}#toolbar=0&navpanes=0" allowfullscreen></iframe>`}
+    </div>`;
   } else if (!isAdmin) {
     html += `<div class="file-note">This file type can't be shown in the browser, so it isn't viewable here.</div>`;
   }
   html += `</div>`;
   return html;
 }
-
-/* ================= mobile PDF.js viewer ================= */
-const pdfViewerState = new Map();
-
-async function getPdfJs(){
-  if (window.pdfjsReady) return window.pdfjsReady;
-  return null;
-}
-
-async function openPdfPreview(id){
-  const viewer = document.getElementById('pdf-viewer-' + id);
-  if (!viewer) return;
-  if (pdfViewerState.has(id) && pdfViewerState.get(id).pdf) {
-    await renderPdfPage(id, pdfViewerState.get(id).page || 1);
-    return;
-  }
-
-  const wrap = document.getElementById('pdf-canvas-wrap-' + id);
-  if (!wrap) return;
-  wrap.innerHTML = '<div class="pdf-loading">Loading PDF&hellip;</div>';
-
-  try {
-    const pdfjsLib = await getPdfJs();
-    if (!pdfjsLib) throw new Error('PDF viewer library is still loading. Please tap View again in a moment.');
-
-    const url = viewer.dataset.pdfUrl;
-    if (!url) throw new Error('PDF file URL is missing.');
-
-    const loadingTask = pdfjsLib.getDocument({
-      url,
-      disableAutoFetch: false,
-      disableStream: false
-    });
-    const pdf = await loadingTask.promise;
-
-    const state = {
-      pdf,
-      page: 1,
-      scale: parseFloat(viewer.dataset.pdfScale || '1.15'),
-      url
-    };
-    pdfViewerState.set(id, state);
-
-    const total = document.getElementById('pdf-total-' + id);
-    if (total) total.textContent = pdf.numPages;
-    updatePdfControls(id);
-    await renderPdfPage(id, 1);
-  } catch (error) {
-    console.error('PDF.js error:', error);
-    wrap.innerHTML = `<div class="pdf-error">Could not display this PDF inside Study Binder.<br>${esc(error.message || error)}<br><br>You can still open the original file using the file link above.</div>`;
-  }
-}
-
-async function renderPdfPage(id, pageNumber){
-  const state = pdfViewerState.get(id);
-  const wrap = document.getElementById('pdf-canvas-wrap-' + id);
-  if (!state || !wrap) return;
-
-  pageNumber = Math.max(1, Math.min(pageNumber, state.pdf.numPages));
-  state.page = pageNumber;
-  const page = await state.pdf.getPage(pageNumber);
-
-  const viewport = page.getViewport({ scale: state.scale });
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d', { alpha: false });
-
-  canvas.width = Math.ceil(viewport.width);
-  canvas.height = Math.ceil(viewport.height);
-  canvas.style.width = Math.ceil(viewport.width) + 'px';
-  canvas.style.height = Math.ceil(viewport.height) + 'px';
-
-  wrap.innerHTML = '';
-  wrap.appendChild(canvas);
-  await page.render({ canvasContext: context, viewport }).promise;
-
-  const input = document.getElementById('pdf-page-' + id);
-  if (input) input.value = pageNumber;
-  updatePdfControls(id);
-}
-
-function updatePdfControls(id){
-  const state = pdfViewerState.get(id);
-  if (!state) return;
-  const prev = document.querySelector(`[data-action="pdf-prev"][data-id="${id}"]`);
-  const next = document.querySelector(`[data-action="pdf-next"][data-id="${id}"]`);
-  if (prev) prev.disabled = state.page <= 1;
-  if (next) next.disabled = state.page >= state.pdf.numPages;
-}
-
-async function changePdfPage(id, delta){
-  const state = pdfViewerState.get(id);
-  if (!state) { await openPdfPreview(id); return; }
-  await renderPdfPage(id, state.page + delta);
-}
-
-async function changePdfZoom(id, delta){
-  const state = pdfViewerState.get(id);
-  if (!state) { await openPdfPreview(id); return; }
-  state.scale = Math.max(0.6, Math.min(2.5, state.scale + delta));
-  const viewer = document.getElementById('pdf-viewer-' + id);
-  if (viewer) viewer.dataset.pdfScale = state.scale.toFixed(2);
-  await renderPdfPage(id, state.page);
-}
-
-async function fitPdfToWidth(id){
-  const state = pdfViewerState.get(id);
-  const wrap = document.getElementById('pdf-canvas-wrap-' + id);
-  if (!state || !wrap) { await openPdfPreview(id); return; }
-
-  const page = await state.pdf.getPage(state.page);
-  const baseViewport = page.getViewport({ scale: 1 });
-  const available = Math.max(260, wrap.clientWidth - 28);
-  state.scale = Math.max(0.6, Math.min(2.5, available / baseViewport.width));
-  const viewer = document.getElementById('pdf-viewer-' + id);
-  if (viewer) viewer.dataset.pdfScale = state.scale.toFixed(2);
-  await renderPdfPage(id, state.page);
-}
-
-document.addEventListener('change', async (e) => {
-  if (!e.target.matches('.pdf-page-input')) return;
-  const id = e.target.dataset.id;
-  const state = pdfViewerState.get(id);
-  if (!state) return;
-  const requested = parseInt(e.target.value, 10);
-  if (!Number.isFinite(requested)) return;
-  await renderPdfPage(id, requested);
-});
-
 
 /* ================= resources ================= */
 function openResourceForm(item){
@@ -1640,21 +1461,6 @@ function renderNoteList(){
       </div>
     </div>`).join('') + `</div>`;
 }
-</script>
-
-<script type="module">
-window.pdfjsReady = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.min.mjs")
-  .then((pdfjsLib) => {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/pdf.worker.min.mjs";
-    window.pdfjsLib = pdfjsLib;
-    return pdfjsLib;
-  })
-  .catch((error) => {
-    console.error("PDF.js failed to load:", error);
-    window.pdfjsReady = Promise.reject(error);
-    return null;
-  });
 </script>
 
 <script>

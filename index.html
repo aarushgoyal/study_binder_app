@@ -197,41 +197,6 @@
   .modal-error { background: #FBEAE8; border: 1px solid #E9BAB3; color: var(--danger); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
 
   /* ================= theme / dark mode ================= */
-const THEME_STORAGE_KEY = 'study-binder-theme';
-
-function applyTheme(theme) {
-  const selected = theme === 'dark' ? 'dark' : 'light';
-  document.documentElement.dataset.theme = selected;
-  try { localStorage.setItem(THEME_STORAGE_KEY, selected); } catch (error) {}
-
-  const toggle = document.getElementById('themeToggle');
-  if (toggle) {
-    toggle.innerHTML = selected === 'dark' ? '☀ Light' : '🌙 Dark';
-    toggle.setAttribute('aria-label', selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-    toggle.title = selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
-  }
-
-  const themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) themeMeta.setAttribute('content', selected === 'dark' ? '#151A18' : '#1B2430');
-}
-
-function initTheme() {
-  let saved = null;
-  try { saved = localStorage.getItem(THEME_STORAGE_KEY); } catch (error) {}
-  applyTheme(saved === 'dark' ? 'dark' : 'light');
-}
-
-function toggleTheme() {
-  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-}
-
-initTheme();
-
-document.addEventListener('DOMContentLoaded', () => {
-  const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
-});
-
 /* ================= app update notification ================= */
   .app-update-banner {
     position: fixed;
@@ -397,6 +362,44 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 </style>
+
+<script>
+/* ================= theme / dark mode ================= */
+const THEME_STORAGE_KEY = 'study-binder-theme';
+
+function applyTheme(theme) {
+  const selected = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = selected;
+  try { localStorage.setItem(THEME_STORAGE_KEY, selected); } catch (error) {}
+
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.innerHTML = selected === 'dark' ? '☀ Light' : '🌙 Dark';
+    toggle.setAttribute('aria-label', selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    toggle.title = selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', selected === 'dark' ? '#151A18' : '#1B2430');
+}
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_STORAGE_KEY); } catch (error) {}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+}
+
+function toggleTheme() {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+}
+
+initTheme();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
+});
+</script>
 </head>
 <body>
 <div id="app"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F6F1;font-family:-apple-system,sans-serif;color:#6B7280;font-size:14px;">Loading Study Binder&hellip;</div></div>

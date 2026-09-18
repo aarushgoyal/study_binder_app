@@ -195,6 +195,85 @@
   .modal-card p.hint { font-size: 13px; color: var(--text-dim); margin: 0 0 16px 0; }
   .modal-error { background: #FBEAE8; border: 1px solid #E9BAB3; color: var(--danger); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
 
+  /* ================= app update notification ================= */
+  .app-update-banner {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translate(-50%, 20px);
+    width: min(92vw, 520px);
+    background: var(--ink);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .app-update-banner.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+  }
+  .app-update-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 19px;
+  }
+  .app-update-copy {
+    flex: 1;
+    min-width: 0;
+  }
+  .app-update-copy strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+  .app-update-copy span {
+    display: block;
+    color: #C8CDD3;
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .app-update-actions {
+    display: flex;
+    gap: 7px;
+    flex-shrink: 0;
+  }
+  .app-update-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 11px;
+    font: 600 12.5px inherit;
+    cursor: pointer;
+  }
+  .app-update-btn.primary {
+    background: var(--gold);
+    color: var(--ink);
+  }
+  .app-update-btn.secondary {
+    background: rgba(255,255,255,0.08);
+    color: #E8EAE3;
+  }
+  @media (max-width: 520px) {
+    .app-update-banner { bottom: 12px; padding: 12px; gap: 10px; }
+    .app-update-icon { width: 34px; height: 34px; border-radius: 9px; }
+    .app-update-actions { flex-direction: column; }
+    .app-update-btn { padding: 7px 10px; }
+  }
+
   @media (max-width: 780px) {
     .sidebar { position: fixed; z-index: 20; left: 0; top: 0; bottom: 0; transform: translateX(-100%); transition: transform 0.2s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.25); }
     .sidebar.open { transform: translateX(0); }
@@ -210,6 +289,18 @@
 </head>
 <body>
 <div id="app"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F6F1;font-family:-apple-system,sans-serif;color:#6B7280;font-size:14px;">Loading Study Binder&hellip;</div></div>
+
+<div class="app-update-banner" id="appUpdateBanner" role="status" aria-live="polite">
+  <div class="app-update-icon">&#8635;</div>
+  <div class="app-update-copy">
+    <strong>New version available</strong>
+    <span>Study Binder has been updated.</span>
+  </div>
+  <div class="app-update-actions">
+    <button class="app-update-btn secondary" id="appUpdateLater">Later</button>
+    <button class="app-update-btn primary" id="appUpdateNow">Update now</button>
+  </div>
+</div>
 
 <!--
   ONE-TIME SETUP FOR YOU (the site owner):
@@ -292,6 +383,66 @@ const ui = {
 };
 
 let pendingFile = { resource: null, question: null };
+
+/* ================= app update notification ================= */
+let pendingServiceWorker = null;
+let updateReloading = false;
+
+function showAppUpdateBanner(worker) {
+  pendingServiceWorker = worker || pendingServiceWorker;
+  const banner = document.getElementById('appUpdateBanner');
+  if (banner) banner.classList.add('show');
+}
+
+function hideAppUpdateBanner() {
+  const banner = document.getElementById('appUpdateBanner');
+  if (banner) banner.classList.remove('show');
+}
+
+async function applyAppUpdate() {
+  const worker = pendingServiceWorker;
+  if (!worker) return;
+
+  updateReloading = true;
+  worker.postMessage({ type: 'SKIP_WAITING' });
+  hideAppUpdateBanner();
+}
+
+function setupAppUpdateNotifications(registration) {
+  if (!registration) return;
+
+  if (registration.waiting) {
+    showAppUpdateBanner(registration.waiting);
+  }
+
+  registration.addEventListener('updatefound', () => {
+    const newWorker = registration.installing;
+    if (!newWorker) return;
+
+    newWorker.addEventListener('statechange', () => {
+      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        showAppUpdateBanner(newWorker);
+      }
+    });
+  });
+
+  // Ask the browser to check for a newer service worker when the app opens.
+  registration.update().catch(() => {});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const nowBtn = document.getElementById('appUpdateNow');
+  const laterBtn = document.getElementById('appUpdateLater');
+
+  if (nowBtn) nowBtn.addEventListener('click', applyAppUpdate);
+  if (laterBtn) laterBtn.addEventListener('click', hideAppUpdateBanner);
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (updateReloading) window.location.reload();
+  });
+}
 
 /* ================= boot ================= */
 window.addEventListener('DOMContentLoaded', boot);
@@ -1467,7 +1618,10 @@ function renderNoteList(){
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js")
-      .then(() => console.log("Study Binder PWA service worker registered."))
+      .then(registration => {
+        console.log("Study Binder PWA service worker registered.");
+        setupAppUpdateNotifications(registration);
+      })
       .catch(err => console.error("PWA registration failed:", err));
   });
 }

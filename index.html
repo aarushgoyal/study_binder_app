@@ -196,7 +196,43 @@
   .modal-card p.hint { font-size: 13px; color: var(--text-dim); margin: 0 0 16px 0; }
   .modal-error { background: #FBEAE8; border: 1px solid #E9BAB3; color: var(--danger); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
 
-  /* ================= app update notification ================= */
+  /* ================= theme / dark mode ================= */
+const THEME_STORAGE_KEY = 'study-binder-theme';
+
+function applyTheme(theme) {
+  const selected = theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = selected;
+  try { localStorage.setItem(THEME_STORAGE_KEY, selected); } catch (error) {}
+
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.innerHTML = selected === 'dark' ? '☀ Light' : '🌙 Dark';
+    toggle.setAttribute('aria-label', selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    toggle.title = selected === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+  }
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', selected === 'dark' ? '#151A18' : '#1B2430');
+}
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_STORAGE_KEY); } catch (error) {}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+}
+
+function toggleTheme() {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+}
+
+initTheme();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
+});
+
+/* ================= app update notification ================= */
   .app-update-banner {
     position: fixed;
     left: 50%;
@@ -286,10 +322,86 @@
     .main { padding: 20px; }
     .chapter-header h1 { font-size: 24px; }
   }
+
+  /* ================= dark mode ================= */
+  :root {
+    --theme-toggle-bg: #FFFFFF;
+    --theme-toggle-text: #1B2430;
+    --theme-toggle-border: #DDE0D6;
+  }
+
+  html[data-theme="dark"] {
+    --ink: #10251B;
+    --paper: #151A18;
+    --card: #202723;
+    --border: #38433D;
+    --accent: #6FAF86;
+    --accent-soft: #263B30;
+    --gold: #D2A24C;
+    --text: #EEE9D8;
+    --text-dim: #A7B0AA;
+    --danger: #E07A70;
+    --theme-toggle-bg: #26312C;
+    --theme-toggle-text: #F1E8D2;
+    --theme-toggle-border: #46534B;
+    color-scheme: dark;
+  }
+
+  html[data-theme="dark"] body { background: var(--paper); }
+  html[data-theme="dark"] .setup-card,
+  html[data-theme="dark"] .form-card,
+  html[data-theme="dark"] .item-card,
+  html[data-theme="dark"] .modal-card,
+  html[data-theme="dark"] .stat-tile { background: var(--card); }
+  html[data-theme="dark"] .setup-wrap input[type=text],
+  html[data-theme="dark"] .setup-wrap input[type=email],
+  html[data-theme="dark"] .setup-wrap input[type=password],
+  html[data-theme="dark"] .field input[type=text],
+  html[data-theme="dark"] .field input[type=email],
+  html[data-theme="dark"] .field input[type=password],
+  html[data-theme="dark"] .field textarea,
+  html[data-theme="dark"] .file-choose-btn {
+    background: #1A201D;
+    color: var(--text);
+  }
+  html[data-theme="dark"] .panel-empty { background: rgba(255,255,255,0.025); }
+  html[data-theme="dark"] #searchDropdown { background: #202723; color: var(--text); }
+  html[data-theme="dark"] .search-result-item:hover { background: var(--accent-soft); }
+  html[data-theme="dark"] .tab.active { color: var(--text); }
+  html[data-theme="dark"] .mobile-bar { background: var(--paper); }
+  html[data-theme="dark"] .mobile-bar button { background: var(--card); color: var(--text); }
+  html[data-theme="dark"] .modal-error,
+  html[data-theme="dark"] .setup-error { background: #3A211E; border-color: #75443E; }
+
+  .theme-toggle {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    z-index: 120;
+    border: 1px solid var(--theme-toggle-border);
+    background: var(--theme-toggle-bg);
+    color: var(--theme-toggle-text);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font: 600 12.5px 'Public Sans', -apple-system, sans-serif;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .theme-toggle:hover { transform: translateY(-1px); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  @media (max-width: 780px) {
+    .theme-toggle { top: 10px; right: 10px; padding: 7px 10px; }
+  }
+
 </style>
 </head>
 <body>
 <div id="app"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F5F6F1;font-family:-apple-system,sans-serif;color:#6B7280;font-size:14px;">Loading Study Binder&hellip;</div></div>
+
+<button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch theme">🌙 Dark</button>
 
 <div class="app-update-banner" id="appUpdateBanner" role="status" aria-live="polite">
   <div class="app-update-icon">&#8635;</div>

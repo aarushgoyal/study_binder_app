@@ -311,8 +311,15 @@ async function boot(){
   }
 
   sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-  });
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    experimental: {
+      passkey: true
+    }
+  }
+});
 
   let recoveryMode = false;
   sbClient.auth.onAuthStateChange((event) => {

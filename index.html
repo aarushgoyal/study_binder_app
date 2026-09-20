@@ -1421,11 +1421,11 @@ async function reorderChapters(fromId, toId){
   const [moved] = chapters.splice(fromIdx, 1);
   chapters.splice(toIdx, 0, moved);
   renderChapterList();
-  const updates = chapters.map((c, idx) => ({ id: c.id, position: idx }));
-  const { error } = await sbClient.from('chapters').upsert(updates, { onConflict: 'id' });
-  if (error) {
-    console.error('Could not save new chapter order:', error.message);
-    alert('The new order could not be saved (' + error.message + '). Reverting to the last saved order.');
+  const results = await Promise.all(chapters.map((c, idx) => sbClient.from('chapters').update({ position: idx }).eq('id', c.id)));
+  const failed = results.find(r => r.error);
+  if (failed) {
+    console.error('Could not save new chapter order:', failed.error.message);
+    alert('The new order could not be saved (' + failed.error.message + '). Reverting to the last saved order.');
     await loadChapters();
     renderChapterList();
   }

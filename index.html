@@ -74,11 +74,18 @@
   .search-empty { padding: 10px 12px; font-size: 13px; color: var(--text-dim); }
 
   .nav-btn { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
-    color: #E8EAE3; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; cursor: pointer;
+    color: #E8EAE5; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; cursor: pointer;
     margin-bottom: 10px; text-align: left; font-family: inherit; }
   .nav-btn:hover { background: rgba(255,255,255,0.12); }
 
   .chapter-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 6px 4px 6px; }
+  .section-header:first-child { padding-top: 0; }
+  .section-header-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #8B94A0; font-weight: 700; }
+  .section-header-actions { display: none; gap: 4px; }
+  .section-header:hover .section-header-actions { display: flex; }
+  select.section-select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; padding: 8px 10px; font-size: 13.5px; font-family: inherit; }
+  select.section-select option { color: #23282F; background: #fff; }
   .chapter-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; border-left: 3px solid transparent; cursor: pointer; }
   .chapter-item[draggable="true"] { cursor: grab; }
   .chapter-item.drag-over { box-shadow: inset 0 2px 0 var(--gold); }
@@ -476,6 +483,7 @@ let sbClient = null;
 let currentUser = null;
 let isAdmin = false;
 let chapters = [];
+let sections = [];
 let activeChapterId = null;
 let activeTab = 'resources';
 let currentView = 'chapter'; // 'chapter' | 'devices'
@@ -496,6 +504,9 @@ const ui = {
   confirmResetAll: false,
   showAdminLogin: false,
   adminLoginError: null,
+  addingSection: false,
+  editingSectionId: null,
+  confirmDeleteSectionId: null,
 };
 
 let pendingFile = { resource: null, question: null };
@@ -598,7 +609,7 @@ async function boot(){
   if (session && session.user) {
     currentUser = session.user;
     isAdmin = !!(currentUser && currentUser.is_anonymous === false);
-    const [device] = await Promise.all([ checkInDevice(), loadChapters() ]);
+    const [device] = await Promise.all([ checkInDevice(), loadChaptersAndSections() ]);
     if (!isAdmin && device && device.revoked) { renderRevokedScreen(); return; }
     renderShell();
   } else {
@@ -643,7 +654,7 @@ async function setNewPassword(){
   const { data, error } = await sbClient.auth.updateUser({ password: pw });
   if (error) { renderSetNewPasswordScreen(error.message); return; }
   currentUser = data.user; isAdmin = true;
-  await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+  await Promise.all([ registerDevice(guessDeviceLabel()), loadChaptersAndSections() ]);
   renderShell();
 }
 
@@ -687,7 +698,7 @@ async function visitorContinue(){
   currentUser = data.user; isAdmin = false;
   let device;
   try {
-    [device] = await Promise.all([ registerDevice(name), loadChapters() ]);
+    [device] = await Promise.all([ registerDevice(name), loadChaptersAndSections() ]);
   } catch (error) {
     await sbClient.auth.signOut();
     currentUser = null;
@@ -706,7 +717,7 @@ async function gateAdminLogin(){
   if (error) { renderLandingGate(error.message); return; }
   currentUser = data.user; isAdmin = true;
   if (previousAnonymousUserId) await removeDevice(previousAnonymousUserId);
-  await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+  await Promise.all([ registerDevice(guessDeviceLabel()), loadChaptersAndSections() ]);
   renderShell();
 }
 async function gateAdminForgot(){
@@ -747,6 +758,14 @@ async function loadChapters(){
   let { data, error } = await sbClient.from('chapters').select('*').order('position', { ascending: true, nullsFirst: false });
   if (error) ({ data, error } = await sbClient.from('chapters').select('*').order('created_at', { ascending: true }));
   chapters = data || [];
+}
+async function loadSections(){
+  let { data, error } = await sbClient.from('sections').select('*').order('position', { ascending: true, nullsFirst: false });
+  if (error) ({ data, error } = await sbClient.from('sections').select('*').order('created_at', { ascending: true }));
+  sections = data || [];
+}
+async function loadChaptersAndSections(){
+  await Promise.all([ loadChapters(), loadSections() ]);
 }
 async function loadChapterItems(chapterId){
   const [r, q, n] = await Promise.all([
@@ -807,7 +826,7 @@ async function adminLogin(){
   if (previousAnonymousUserId) await removeDevice(previousAnonymousUserId);
   ui.showAdminLogin = false;
   renderModal();
-  await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+  await Promise.all([ registerDevice(guessDeviceLabel()), loadChaptersAndSections() ]);
   renderShell();
 }
 async function adminForgotPassword(){
@@ -888,7 +907,7 @@ async function adminPasskeyLogin(){
       return;
     }
 
-    await Promise.all([ registerDevice(guessDeviceLabel()), loadChapters() ]);
+    await Promise.all([ registerDevice(guessDeviceLabel()), loadChaptersAndSections() ]);
     renderShell();
   } catch (error) {
     console.error('Passkey sign-in failed:', error);
@@ -999,6 +1018,8 @@ document.addEventListener('click', (e) => {
   if (!isAdmin) {
     const guardedActions = ['start-add-chapter','submit-add-chapter','start-rename','save-rename',
       'confirm-delete-chapter','delete-chapter','confirm-reset-all','reset-all','export-data','trigger-import',
+      'start-add-section','submit-add-section','start-rename-section','save-rename-section',
+      'confirm-delete-section','delete-section',
       'open-resource-form','submit-resource-form','edit-resource','delete-resource',
       'open-question-form','submit-question-form','edit-question','delete-question','toggle-mastered',
       'open-note-form','submit-note-form','edit-note','delete-note'];
@@ -1018,6 +1039,16 @@ document.addEventListener('click', (e) => {
   if (action === 'confirm-reset-all') { ui.confirmResetAll = true; renderAddArea(); }
   if (action === 'cancel-reset-all') { ui.confirmResetAll = false; renderAddArea(); }
   if (action === 'reset-all') { resetAll(); }
+
+  if (action === 'start-add-section') { ui.addingSection = true; renderAddArea(); focusEl('newSectionInput'); }
+  if (action === 'cancel-add-section') { ui.addingSection = false; renderAddArea(); }
+  if (action === 'submit-add-section') { submitAddSection(); }
+  if (action === 'start-rename-section') { ui.editingSectionId = el.dataset.id; renderChapterList(); focusEl('renameSectionInput'); }
+  if (action === 'cancel-rename-section') { ui.editingSectionId = null; renderChapterList(); }
+  if (action === 'save-rename-section') { submitRenameSection(el.dataset.id); }
+  if (action === 'confirm-delete-section') { ui.confirmDeleteSectionId = el.dataset.id; renderChapterList(); }
+  if (action === 'cancel-delete-section') { ui.confirmDeleteSectionId = null; renderChapterList(); }
+  if (action === 'delete-section') { deleteSection(el.dataset.id); }
 
   if (action === 'export-data') { exportAllData(); }
   if (action === 'trigger-import') { document.getElementById('importFileInput').click(); }
@@ -1111,6 +1142,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && e.target.id === 'newChapterInput') { ui.addingChapter=false; renderAddArea(); }
   if (e.key === 'Enter' && e.target.id === 'renameInput') submitRename(ui.editingChapterId);
   if (e.key === 'Escape' && e.target.id === 'renameInput') { ui.editingChapterId=null; renderChapterList(); }
+  if (e.key === 'Enter' && e.target.id === 'newSectionInput') submitAddSection();
+  if (e.key === 'Escape' && e.target.id === 'newSectionInput') { ui.addingSection=false; renderAddArea(); }
+  if (e.key === 'Enter' && e.target.id === 'renameSectionInput') submitRenameSection(ui.editingSectionId);
+  if (e.key === 'Escape' && e.target.id === 'renameSectionInput') { ui.editingSectionId=null; renderChapterList(); }
   if (e.key === 'Escape' && e.target.id === 'searchInput') { e.target.value=''; searchTerm=''; renderChapterList(); renderSearchDropdown(null); }
   if (e.key === 'Enter' && (e.target.id === 'adminEmail' || e.target.id === 'adminPassword')) adminLogin();
   if (e.key === 'Enter' && e.target.id === 'visitorName') visitorContinue();
@@ -1181,51 +1216,112 @@ function setSidebarOpenState(){
   if (overlay) overlay.outerHTML = ui.sidebarOpen ? '<div class="overlay" id="overlay" data-action="close-sidebar"></div>' : '<div id="overlay"></div>';
 }
 
+function chapterRowHtml(c, idx){
+  let html = '';
+  if (ui.editingChapterId === c.id) {
+    const sectionOptions = `<option value="">No section</option>` +
+      sections.map(s => `<option value="${s.id}" ${c.section_id===s.id?'selected':''}>${esc(s.title)}</option>`).join('');
+    html += `
+      <div class="rename-row" style="flex-direction:column;align-items:stretch;">
+        <input id="renameInput" type="text" value="${esc(c.title)}" />
+        ${sections.length ? `<select id="renameSectionSelect" class="section-select">${sectionOptions}</select>` : ''}
+        <div class="mini-row">
+          <button class="mini-btn primary" data-action="save-rename" data-id="${c.id}">Save</button>
+          <button class="mini-btn ghost" data-action="cancel-rename">Cancel</button>
+        </div>
+      </div>`;
+  } else {
+    html += `
+      <div class="chapter-item ${activeChapterId===c.id && currentView==='chapter' ?'active':''}" ${isAdmin?`draggable="true" data-drag-id="${c.id}"`:''} data-action="select-chapter" data-id="${c.id}">
+        <span class="chapter-num">${String(idx+1).padStart(2,'0')}</span>
+        <span class="chapter-title">${esc(c.title)}</span>
+        ${isAdmin ? `<span class="chapter-actions">
+          <button class="icon-btn" data-action="start-rename" data-id="${c.id}">&#9998;</button>
+          <button class="icon-btn" data-action="confirm-delete-chapter" data-id="${c.id}">&#128465;</button>
+        </span>` : ''}
+      </div>`;
+  }
+  if (ui.confirmDeleteChapterId === c.id) {
+    html += `
+      <div class="inline-confirm">
+        <p>Delete "${esc(c.title)}" and everything in it?</p>
+        <div class="mini-row">
+          <button class="mini-btn ghost" data-action="cancel-delete-chapter">Cancel</button>
+          <button class="mini-btn danger" data-action="delete-chapter" data-id="${c.id}">Delete</button>
+        </div>
+      </div>`;
+  }
+  return html;
+}
+
+function sectionHeaderHtml(s){
+  if (ui.editingSectionId === s.id) {
+    return `
+      <div class="rename-row" style="margin-top:12px;">
+        <input id="renameSectionInput" type="text" value="${esc(s.title)}" />
+        <button class="icon-btn" data-action="save-rename-section" data-id="${s.id}">&#10003;</button>
+        <button class="icon-btn" data-action="cancel-rename-section">&#10005;</button>
+      </div>`;
+  }
+  let html = `
+    <div class="section-header">
+      <span class="section-header-title">${esc(s.title)}</span>
+      ${isAdmin ? `<span class="section-header-actions">
+        <button class="icon-btn" data-action="start-rename-section" data-id="${s.id}">&#9998;</button>
+        <button class="icon-btn" data-action="confirm-delete-section" data-id="${s.id}">&#128465;</button>
+      </span>` : ''}
+    </div>`;
+  if (ui.confirmDeleteSectionId === s.id) {
+    html += `
+      <div class="inline-confirm">
+        <p>Delete section "${esc(s.title)}"? Its chapters won't be deleted, just ungrouped.</p>
+        <div class="mini-row">
+          <button class="mini-btn ghost" data-action="cancel-delete-section">Cancel</button>
+          <button class="mini-btn danger" data-action="delete-section" data-id="${s.id}">Delete</button>
+        </div>
+      </div>`;
+  }
+  return html;
+}
+
 function renderChapterList(){
   const el = document.getElementById('chapterListContainer');
   if (!el) return;
   const term = searchTerm.trim().toLowerCase();
-  const visible = term ? chapters.filter(c => c.title.toLowerCase().includes(term)) : chapters;
+  const matches = (title) => !term || title.toLowerCase().includes(term);
 
-  let rows = '';
-  if (chapters.length === 0) {
-    rows = `<div style="font-size:13px;color:#7C8794;padding:10px 4px;">No chapters yet${isAdmin ? '. Add your first one below.' : ' yet.'}</div>`;
-  } else if (visible.length === 0) {
-    rows = '<div style="font-size:13px;color:#7C8794;padding:10px 4px;">No chapters match your search.</div>';
-  } else {
-    visible.forEach((c) => {
-      const idx = chapters.indexOf(c);
-      if (ui.editingChapterId === c.id) {
-        rows += `
-          <div class="rename-row">
-            <input id="renameInput" type="text" value="${esc(c.title)}" />
-            <button class="icon-btn" data-action="save-rename" data-id="${c.id}">&#10003;</button>
-            <button class="icon-btn" data-action="cancel-rename">&#10005;</button>
-          </div>`;
-      } else {
-        rows += `
-          <div class="chapter-item ${activeChapterId===c.id && currentView==='chapter' ?'active':''}" ${isAdmin?`draggable="true" data-drag-id="${c.id}"`:''} data-action="select-chapter" data-id="${c.id}">
-            <span class="chapter-num">${String(idx+1).padStart(2,'0')}</span>
-            <span class="chapter-title">${esc(c.title)}</span>
-            ${isAdmin ? `<span class="chapter-actions">
-              <button class="icon-btn" data-action="start-rename" data-id="${c.id}">&#9998;</button>
-              <button class="icon-btn" data-action="confirm-delete-chapter" data-id="${c.id}">&#128465;</button>
-            </span>` : ''}
-          </div>`;
-      }
-      if (ui.confirmDeleteChapterId === c.id) {
-        rows += `
-          <div class="inline-confirm">
-            <p>Delete "${esc(c.title)}" and everything in it?</p>
-            <div class="mini-row">
-              <button class="mini-btn ghost" data-action="cancel-delete-chapter">Cancel</button>
-              <button class="mini-btn danger" data-action="delete-chapter" data-id="${c.id}">Delete</button>
-            </div>
-          </div>`;
-      }
-    });
+  if (chapters.length === 0 && sections.length === 0) {
+    el.innerHTML = `<div style="font-size:13px;color:#7C8794;padding:10px 4px;">No chapters yet${isAdmin ? '. Add a section or chapter below.' : ' yet.'}</div>`;
+    return;
   }
-  el.innerHTML = rows;
+
+  let html = '';
+  let anyVisible = false;
+
+  sections.forEach(s => {
+    const chaptersInSection = chapters.filter(c => c.section_id === s.id && matches(c.title));
+    if (term && chaptersInSection.length === 0 && !matches(s.title)) return;
+    anyVisible = true;
+    html += sectionHeaderHtml(s);
+    if (chaptersInSection.length === 0) {
+      html += `<div style="font-size:12px;color:#6D7684;padding:2px 10px 8px 12px;">No chapters in this section yet.</div>`;
+    } else {
+      chaptersInSection.forEach((c, idx) => { html += chapterRowHtml(c, idx); });
+    }
+  });
+
+  const ungrouped = chapters.filter(c => !c.section_id && matches(c.title));
+  if (ungrouped.length > 0) {
+    anyVisible = true;
+    if (sections.length > 0) html += `<div class="section-header"><span class="section-header-title">Other chapters</span></div>`;
+    ungrouped.forEach((c, idx) => { html += chapterRowHtml(c, idx); });
+  }
+
+  if (!anyVisible) {
+    html = '<div style="font-size:13px;color:#7C8794;padding:10px 4px;">No chapters match your search.</div>';
+  }
+
+  el.innerHTML = html;
 }
 
 function renderAddArea(){
@@ -1243,17 +1339,30 @@ function renderAddArea(){
   const addAreaHtml = ui.addingChapter ? `
     <div class="add-form">
       <input id="newChapterInput" type="text" placeholder="Chapter title" />
+      ${sections.length ? `<select id="newChapterSection" class="section-select">
+        <option value="">No section</option>
+        ${sections.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('')}
+      </select>` : ''}
       <div class="mini-row">
         <button class="mini-btn ghost" data-action="cancel-add-chapter">Cancel</button>
         <button class="mini-btn primary" data-action="submit-add-chapter">Add</button>
       </div>
     </div>` : `<button class="add-btn" data-action="start-add-chapter">&#43; New chapter</button>`;
 
+  const addSectionHtml = ui.addingSection ? `
+    <div class="add-form" style="margin-top:8px;">
+      <input id="newSectionInput" type="text" placeholder="Section title (e.g. Leadership)" />
+      <div class="mini-row">
+        <button class="mini-btn ghost" data-action="cancel-add-section">Cancel</button>
+        <button class="mini-btn primary" data-action="submit-add-section">Add</button>
+      </div>
+    </div>` : `<button class="add-btn" data-action="start-add-section" style="margin-top:8px;">&#43; New section</button>`;
+
   let resetHtml = '';
-  if (chapters.length > 0) {
+  if (chapters.length > 0 || sections.length > 0) {
     resetHtml = ui.confirmResetAll ? `
       <div class="inline-confirm">
-        <p>Erase all chapters and their content? This can't be undone.</p>
+        <p>Erase all sections, chapters, and their content? This can't be undone.</p>
         <div class="mini-row">
           <button class="mini-btn ghost" data-action="cancel-reset-all">Cancel</button>
           <button class="mini-btn danger" data-action="reset-all">Erase all</button>
@@ -1263,6 +1372,7 @@ function renderAddArea(){
 
   el.innerHTML = `
     ${addAreaHtml}
+    ${addSectionHtml}
     ${resetHtml}
     <button class="sidebar-footer-link" data-action="enable-fingerprint">&#128274; Enable fingerprint / passkey</button>
     <button class="sidebar-footer-link" data-action="export-data">&#11015; Backup my data</button>
@@ -1391,11 +1501,13 @@ function refreshTabVisibility(){
 /* ---- chapters CRUD (admin only, guarded above) ---- */
 async function submitAddChapter(){
   const input = document.getElementById('newChapterInput');
+  const sectionSelect = document.getElementById('newChapterSection');
   const title = input ? input.value.trim() : '';
   if (!title) return;
+  const sectionId = sectionSelect && sectionSelect.value ? sectionSelect.value : null;
   const maxPos = chapters.reduce((m,c) => Math.max(m, (c.position ?? 0)), 0);
-  let { data, error } = await sbClient.from('chapters').insert({ title, position: maxPos + 1 }).select().single();
-  if (error && /position/i.test(error.message)) ({ data, error } = await sbClient.from('chapters').insert({ title }).select().single());
+  let { data, error } = await sbClient.from('chapters').insert({ title, position: maxPos + 1, section_id: sectionId }).select().single();
+  if (error && /position|section_id/i.test(error.message)) ({ data, error } = await sbClient.from('chapters').insert({ title }).select().single());
   if (error) { alert('Could not add chapter: ' + error.message); return; }
   ui.addingChapter = false;
   await loadChapters();
@@ -1404,10 +1516,13 @@ async function submitAddChapter(){
 }
 async function submitRename(id){
   const input = document.getElementById('renameInput');
+  const sectionSelect = document.getElementById('renameSectionSelect');
   const title = input ? input.value.trim() : '';
   ui.editingChapterId = null;
   if (!title) { renderChapterList(); return; }
-  await sbClient.from('chapters').update({ title }).eq('id', id);
+  const update = { title };
+  if (sectionSelect) update.section_id = sectionSelect.value || null;
+  await sbClient.from('chapters').update(update).eq('id', id);
   await loadChapters();
   renderChapterList();
 }
@@ -1425,11 +1540,43 @@ async function deleteChapter(id){
   renderChapterList();
   renderMainInto();
 }
+
+/* ---- sections CRUD (admin only, guarded above) ---- */
+async function submitAddSection(){
+  const input = document.getElementById('newSectionInput');
+  const title = input ? input.value.trim() : '';
+  if (!title) return;
+  const maxPos = sections.reduce((m,s) => Math.max(m, (s.position ?? 0)), 0);
+  let { error } = await sbClient.from('sections').insert({ title, position: maxPos + 1 });
+  if (error && /position/i.test(error.message)) ({ error } = await sbClient.from('sections').insert({ title }));
+  if (error) { alert('Could not add section: ' + error.message); return; }
+  ui.addingSection = false;
+  await loadSections();
+  renderChapterList();
+  renderAddArea();
+}
+async function submitRenameSection(id){
+  const input = document.getElementById('renameSectionInput');
+  const title = input ? input.value.trim() : '';
+  ui.editingSectionId = null;
+  if (!title) { renderChapterList(); return; }
+  await sbClient.from('sections').update({ title }).eq('id', id);
+  await loadSections();
+  renderChapterList();
+}
+async function deleteSection(id){
+  ui.confirmDeleteSectionId = null;
+  await sbClient.from('sections').delete().eq('id', id);
+  await loadChaptersAndSections();
+  renderChapterList();
+  renderAddArea();
+}
 async function resetAll(){
   ui.confirmResetAll = false;
   const ids = chapters.map(c => c.id);
   for (const id of ids) await deleteChapter(id);
-  await loadChapters();
+  for (const s of sections) await sbClient.from('sections').delete().eq('id', s.id);
+  await loadChaptersAndSections();
   renderChapterList(); renderAddArea(); renderMainInto();
 }
 

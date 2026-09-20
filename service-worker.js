@@ -1,4 +1,4 @@
-const CACHE_NAME = "study-binder-v3";
+const CACHE_NAME = "study-binder-v4";
 
 const APP_FILES = [
   "./",

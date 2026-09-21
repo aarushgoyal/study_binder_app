@@ -495,6 +495,7 @@ let dragSourceId = null;
 let searchDebounceTimer = null;
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 let inactivityTimer = null;
+let realtimeChannel = null;
 
 const ui = {
   sidebarOpen: false,
@@ -930,6 +931,7 @@ async function signOutForInactivity(){
 }
 async function signOutCurrentUser(message){
   stopInactivityTimer();
+  teardownRealtimeSync();
   const userId = currentUser && currentUser.id;
   if (userId) await removeDevice(userId);
   await sbClient.auth.signOut();
@@ -940,6 +942,50 @@ async function signOutCurrentUser(message){
 ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(eventName => {
   document.addEventListener(eventName, resetInactivityTimer, { passive: true });
 });
+
+/* ================= live sync across devices ================= */
+function setupRealtimeSync(){
+  teardownRealtimeSync();
+  realtimeChannel = sbClient.channel('study-binder-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'chapters' }, handleChaptersRealtime)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'sections' }, handleSectionsRealtime)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'resources' }, (p) => handleItemsRealtime('resources', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, (p) => handleItemsRealtime('questions', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, (p) => handleItemsRealtime('notes', p))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, handleDevicesRealtime)
+    .subscribe();
+}
+function teardownRealtimeSync(){
+  if (realtimeChannel) { sbClient.removeChannel(realtimeChannel); realtimeChannel = null; }
+}
+async function handleChaptersRealtime(){
+  await loadChapters();
+  renderChapterList();
+  if (activeChapterId && !chapters.find(c => c.id === activeChapterId)) {
+    activeChapterId = null;
+    renderMainInto();
+  } else if (currentView === 'chapter') {
+    renderMainInto();
+    refreshTabVisibility();
+  }
+}
+async function handleSectionsRealtime(){
+  await loadSections();
+  renderChapterList();
+}
+async function handleItemsRealtime(kind, payload){
+  const chapterId = (payload.new && payload.new.chapter_id) || (payload.old && payload.old.chapter_id);
+  if (!chapterId || chapterId !== activeChapterId) return;
+  await loadChapterItems(activeChapterId);
+  renderList(kind);
+}
+async function handleDevicesRealtime(payload){
+  const row = payload.new || payload.old;
+  if (currentUser && row && row.user_id === currentUser.id && !isAdmin) {
+    if (payload.eventType !== 'DELETE' && row.revoked) { renderRevokedScreen(); return; }
+  }
+  if (isAdmin && currentView === 'devices') await refreshDevicesList();
+}
 
 /* ================= devices view (admin only) ================= */
 async function openDevicesView(){
@@ -1179,6 +1225,7 @@ function focusEl(id){ setTimeout(()=>{ const el = document.getElementById(id); i
 /* ================= shell / sidebar / main ================= */
 function renderShell(){
   resetInactivityTimer();
+  setupRealtimeSync();
   const app = document.getElementById('app');
   app.style.display = 'flex';
   app.innerHTML = `<div id="overlay"></div><aside class="sidebar" id="sidebar"></aside><main class="main" id="main"></main>`;
